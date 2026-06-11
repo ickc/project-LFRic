@@ -1,0 +1,31 @@
+---
+title: "LFRic Core"
+---
+
+Source: `submodules/lfric_core/`
+
+LFRic Core provides the underlying infrastructure for the Momentum® Atmosphere model and associated applications.
+
+## Structure
+
+```
+lfric_core/
+├── applications/     # Standalone applications built on core infrastructure
+├── components/
+│   ├── coupling/     # OASIS-MCT coupling infrastructure
+│   ├── driver/       # Top-level model driver
+│   ├── inventory/    # Component inventory/registry
+│   ├── lfric-xios/   # XIOS I/O server integration
+│   └── science/      # Science parameterisation interfaces
+├── infrastructure/   # Core infrastructure (mesh, fields, parallelism)
+├── mesh_tools/       # Mesh generation utilities
+├── rose-stem/        # Rose/Cylc test suite
+└── documentation/    # Sphinx-based docs
+```
+
+## Key Resources
+
+- [Documentation](https://metoffice.github.io/lfric_core/)
+- [Releases](https://github.com/MetOffice/lfric_core/releases)
+- [Milestones](https://github.com/metoffice/lfric_core/milestones)
+- [Working Practices](https://metoffice.github.io/simulation-systems/index.html)

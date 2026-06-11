@@ -1,0 +1,15 @@
+[submodule "submodules/arXiv-1809.07267"]
+	path = submodules/arXiv-1809.07267
+	url = git@github.com:ickc/arXiv-1809.07267.git
+[submodule "submodules/lfric_apps"]
+	path = submodules/lfric_apps
+	url = git@github.com:MetOffice/lfric_apps.git
+[submodule "submodules/lfric_core"]
+	path = submodules/lfric_core
+	url = git@github.com:MetOffice/lfric_core.git
+[submodule "submodules/Isambard3-LFRic-Env-Science-Suites"]
+	path = submodules/Isambard3-LFRic-Env-Science-Suites
+	url = git@github.com:UniExeterRSE/Isambard3-LFRic-Env-Science-Suites.git
+[submodule "submodules/LFRic-Atmosphere-Training"]
+	path = submodules/LFRic-Atmosphere-Training
+	url = git@github.com:MetOffice/LFRic-Atmosphere-Training.git

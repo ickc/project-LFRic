@@ -1,0 +1,42 @@
+---
+title: "Isambard3 LFRic Setup"
+---
+
+Source: `submodules/Isambard3-LFRic-Env-Science-Suites/`
+
+A handover bundle keeping the Isambard3 LFRic Spack environment and science suites in sync.
+
+## Toolchains
+
+| Directory | Toolchain |
+|-----------|-----------|
+| `env_lfric_gcc/` | GNU (gfortran) |
+| `env_lfric_nvhpc/` | NVIDIA (nvfortran) |
+
+## Structure
+
+```
+Isambard3-LFRic-Env-Science-Suites/
+├── env_lfric_gcc/     # GNU toolchain Spack environment
+├── env_lfric_nvhpc/   # NVIDIA toolchain Spack environment
+├── suites/            # Rose/Cylc science suites
+└── tests/             # XIOS verification tests
+```
+
+## Quick Start
+
+1. Choose a toolchain and follow its README (`env_lfric_gcc/README.md` or `env_lfric_nvhpc/README.md`)
+2. Pick a suite from `suites/` and follow its README
+3. Ensure the Spack environment is active before running any suite
+4. Optionally run `./tests/xios_verification.sh` to verify XIOS before a full install
+
+## Notes
+
+- XIOS is pinned to IPSL GitLab mirror (revision `2252`) — the old SVN endpoint is retired
+- MetOffice GitHub organisation enforces SAML SSO; SSH keys must be authorized for the org
+- For non-interactive Slurm jobs with an encrypted key, export `GITHUB_SSH_PASSPHRASE` or use HTTPS with a token
+- Cylc VIP relies on SSH agent authentication to reach the scheduler host
+
+## References
+
+- [Isambard 3 Spack setup guide](https://docs.isambard.ac.uk/user-documentation/guides/spack/setup/)

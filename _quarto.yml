@@ -1,0 +1,26 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "LFRic Wiki"
+  description: "Personal wiki for LFRic RSE work with Met Office"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: lfric-core.qmd
+        text: LFRic Core
+      - href: lfric-apps.qmd
+        text: LFRic Apps
+      - href: training.qmd
+        text: Training
+      - href: isambard.qmd
+        text: Isambard3
+      - href: paper.qmd
+        text: Paper
+
+format:
+  html:
+    theme: bootstrap
+    toc: true

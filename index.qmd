@@ -1,0 +1,33 @@
+---
+title: "LFRic Wiki"
+---
+
+Personal wiki and workspace for LFRic RSE work in collaboration with the Met Office.
+
+## What is LFRic?
+
+LFRic (named after Lewis Fry Richardson) is the Met Office's next-generation weather and climate modelling infrastructure. It provides the underlying framework for the **Momentum® Atmosphere** model, designed to run efficiently on modern heterogeneous HPC architectures.
+
+The architecture is based on:
+
+- **GungHo dynamical core** — a finite-element discretisation on a cubed-sphere mesh
+- **PSyclone** — a domain-specific compiler that separates science code from parallel infrastructure
+- **LFRIC Core** — shared infrastructure used across all LFRic applications
+- **LFRic Apps** — science applications including the Momentum® Atmosphere model
+
+## Submodules
+
+| Submodule | Description |
+|-----------|-------------|
+| [arXiv-1809.07267](submodules/arXiv-1809.07267/) | LFRic paper source (Adams et al. 2019) |
+| [lfric_core](submodules/lfric_core/) | Core infrastructure library |
+| [lfric_apps](submodules/lfric_apps/) | Science applications (Momentum® Atm) |
+| [LFRic-Atmosphere-Training](submodules/LFRic-Atmosphere-Training/) | Self-learning training materials |
+| [Isambard3-LFRic-Env-Science-Suites](submodules/Isambard3-LFRic-Env-Science-Suites/) | Spack envs + suites for Isambard3 HPC |
+
+## Key Links
+
+- [LFRic Core docs](https://metoffice.github.io/lfric_core/)
+- [LFRic Apps docs](https://metoffice.github.io/lfric_apps/)
+- [LFRic Atmosphere Training](https://metoffice.github.io/LFRic-Atmosphere-Training)
+- [Simulation Systems discussions](https://github.com/MetOffice/simulation-systems/discussions/categories/lfric)

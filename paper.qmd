@@ -1,0 +1,24 @@
+---
+title: "LFRic Paper (arXiv:1809.07267)"
+---
+
+Source: `submodules/arXiv-1809.07267/`
+
+Adams et al. (2019) — the foundational LFRic paper describing the design and motivation of the LFRic infrastructure.
+
+The LaTeX source (`LFRic.tex`) is maintained in this submodule. Key figures include:
+
+- `Fig1_Cubed_Sphere.png` — the cubed-sphere mesh
+- `Fig3_PSyKAl.pdf` — PSyKAl separation of concerns
+- `Fig4_FieldClass.pdf` — field class hierarchy
+- `Fig5_psyclone_flow.pdf` — PSyclone transformation flow
+- `Fig7_scale-eps-converted-to.pdf` / `Fig8a_strong_scale.pdf` — scaling results
+
+## Citation
+
+```
+Adams, S. V., et al. (2019). LFRic: Meeting the challenges of scalability and
+performance portability in Weather and Climate models.
+Journal of Parallel and Distributed Computing.
+arXiv:1809.07267
+```

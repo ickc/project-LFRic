@@ -1,0 +1,17 @@
+[workspace]
+name = "project-LFRic"
+version = "0.1.0"
+description = "Personal wiki and workspace for LFRic RSE work with Met Office"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
+
+[dependencies]
+quarto = "*"
+
+[activation]
+env = { QUARTO_PORT = "8042" }
+
+[tasks]
+build = { cmd = "quarto render", description = "Render the Quarto project" }
+serve = { cmd = "quarto preview --port $QUARTO_PORT", description = "Serve the Quarto site on port 8042" }
+clean = { cmd = "rm -rf docs", description = "Remove the Quarto build output" }

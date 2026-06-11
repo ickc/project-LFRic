@@ -1,0 +1,30 @@
+---
+title: "LFRic Apps"
+---
+
+Source: `submodules/lfric_apps/`
+
+LFRic Apps is home to the LFRic-based science applications and libraries, including the **Momentum® Atmosphere** model and the **GungHo dynamical core**.
+
+## Structure
+
+```
+lfric_apps/
+├── applications/     # Model application entry points
+├── science/          # Science parameterisations and schemes
+├── interfaces/       # Inter-component interfaces
+├── rose-meta/        # Rose metadata for suite configurations
+├── rose-stem/        # Rose/Cylc test suite
+└── documentation/    # Sphinx-based docs
+```
+
+## Example Suites
+
+- `u-dn674` — MetOffice Azure SPICE (low-res LFRic Atm NWP GAL9)
+- `u-dn704` — MetOffice EX HPC (low-res LFRic Atm NWP GAL9)
+
+## Key Resources
+
+- [Documentation](https://metoffice.github.io/lfric_apps/)
+- [Releases](https://github.com/MetOffice/lfric_apps/releases)
+- [Milestones](https://github.com/metoffice/lfric_apps/milestones)

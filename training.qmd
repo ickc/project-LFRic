@@ -1,0 +1,34 @@
+---
+title: "LFRic Atmosphere Training"
+---
+
+Source: `submodules/LFRic-Atmosphere-Training/`
+
+Self-learning training materials for the Momentum LFRic Atmosphere model. Covers introductory to advanced topics.
+
+## Topics Covered
+
+- Model overview and architecture
+- Development working practices
+- Visualisation of mesh data (cubed-sphere)
+- LFRic-based science configurations
+- Understanding model input/output files
+- Navigating code repositories
+- Running model configurations
+
+## Structure
+
+```
+LFRic-Atmosphere-Training/
+├── source/
+│   ├── introduction/
+│   ├── lfric_infrastructure/
+│   ├── mesh_overview/
+│   └── modelling/
+├── notebooks/        # Jupyter notebooks for exercises
+└── Makefile
+```
+
+## Key Resources
+
+- [Online Training Materials](https://metoffice.github.io/LFRic-Atmosphere-Training)
