@@ -2,81 +2,324 @@
 title: "Glossary"
 ---
 
-Terms and notation drawn from the LFRic submodules.
-Sources: `submodules/lfric_core/documentation/source/glossary.rst`, `submodules/lfric_apps/documentation/source/glossary.rst`, and `submodules/lfric_apps/science/gungho/documentation/glossary/glossary.latex`.
+Terms drawn from the LFRic submodules and the Adams et al. 2019 paper
+(`submodules/arXiv-1809.07267/LFRic.tex`).
+Hover over the section headers in the table of contents to jump to a term category.
 
-## LFRic Infrastructure Terms
+## Project and System Names
 
-*Source: LFRic Core glossary*
+LFRic
+:   The Met Office's next-generation weather and climate modelling system, developed to replace the Unified Model for exascale computing. Named after **Lewis Fry Richardson** (see below). "LFRic" refers both to the model (which runs the GungHo dynamical core) and to the software infrastructure that supports it.
 
-Annexed DoF
-:   DoFs on owned cells that are actually owned by another rank that shares them.
+GungHo
+:   The new dynamical core within LFRic, developed to replace ENDGame. It runs on an unstructured cubed-sphere mesh and uses a mixed finite-element spatial discretisation. The name comes from the Mandarin phrase meaning "work together".
 
-Checkpoint Dump
-:   A persistent snapshot of model state written to disk, used to restart a run from a known point. See LFRic Apps documentation for the checkpoint index.
+Lewis Fry Richardson (1881–1953)
+:   British mathematician and meteorologist who in 1922 published the first attempt at numerical weather prediction — a hand computation he called a "forecast factory". LFRic is named in his honour.
 
-Data Model
-:   LFRic core infrastructure which provides the framework for working with data objects supporting LFRic Science Model(s).
+Unified Model (UM)
+:   The Met Office's long-running atmospheric modelling system, introduced into operational use in 1990. The UM uses a lat-lon grid and ENDGame dynamical core. LFRic is its successor.
 
-DoF (Degree of Freedom)
-:   DoFs describe the state of a field. They typically correspond to the value of the field at specific locations in the mesh (although they don't have to), so are equivalent to data values in finite difference models.
+ENDGame
+:   "Even Newer Dynamics for General atmospheric modelling of the environment" — the current dynamical core within the UM, against which GungHo is benchmarked for accuracy. Uses a lat-lon grid with semi-Lagrangian advection.
 
-Edge Cell
-:   Cells that lie on the boundary of a partition. They contain DoFs that are shared with halo cells. Not to be confused with "edge DoFs", which are the DoFs that lie on the edges of a cell.
+Momentum® Atmosphere
+:   The commercial/operational name for the LFRic-based atmosphere model once deployed in operations. Distinct from "LFRic" (the infrastructure) and "GungHo" (the dynamical core).
 
-Ghost Cell
-:   A special subset of cells used during initialisation to determine ownership of shared degrees of freedom (DoFs) on the outer faces, edges, or vertices of the outermost halo cells. They are not part of the active computation and are discarded after the initialisation phase. Note: ghost cells are **not** the same as halo cells.
+PSyclone
+:   A Python-based domain-specific compiler developed at the STFC Hartree Centre. Given algorithm-layer Fortran and kernel metadata, PSyclone generates the parallel PSy-layer code — handling MPI halo exchanges, OpenMP threading, loop colouring, and other transformations — without requiring scientists to write any parallel code.
 
-Global DoF Index
-:   A unique identifier for every DoF. Every partition uses the same global DoF index for the same DoF. If four partitions share a DoF, each partition knows how to identify that DoF and its owner.
-
-Global Mesh
-:   An object describing a 2D mesh which encompasses the entirety of an LFRic application's Model Domain.
-
-Halo
-:   Extra layers of cells surrounding a processor's local domain. These halo cells store data from neighbouring domains, enabling each processor to perform calculations that depend on adjacent values without needing constant inter-processor communication.
-
-Halo DoF
-:   DoFs on halo cells that are owned by other ranks.
-
-Inner Halo
-:   A subset of owned cells used for supporting computation while communication is still ongoing. If a stencil operation requires $n$ halo layers of data, then calculations in cells up to $n$ inner halos are affected by halo data. Any cells from inner halo $(n+1)$ onwards can be computed before or during a halo exchange.
-
-InterMesh Map
-:   Mapping between 2D-mesh cell IDs from source to target meshes. The mapping lists the cell IDs (local to the target mesh) that geographically overlap a given cell ID in the source mesh.
-
-LFRic Application
-:   A program that uses the LFRic infrastructure (Core and/or Apps).
-
-Local Mesh
-:   An object describing a 2D mesh encompassing a sub-section (partition) of a Global Mesh. In addition to the information held by a Global Mesh, it stores partition information unique to its intended process rank.
-
-Mesh
-:   An object describing a 3D mesh encompassing a sub-section (partition) of the Global Mesh. Derived from the corresponding Local Mesh object for a given process rank and an extrusion object configured by an LFRic application.
-
-Mesh Entity
-:   A fundamental geometric component of the computational mesh, comprising: 3D volumes, 2D faces, 1D edges, and 0D vertices.
-
-Model Domain
-:   The geographical domain extents to which an LFRic application is configured, e.g. GCM (global), LAM (limited-area).
-
-Modeldb
-:   An object that encapsulates all the data required to describe both the scientific and technical state of a model.
-
-Owned DoF
-:   DoFs on owned cells that are owned by the local rank.
-
-Partitioning
-:   Dividing a system's computational domain (including data and workload) into smaller sections (partitions) that can be processed in parallel.
+PSyKAl
+:   The three-layer software architecture that enforces separation of concerns in LFRic. Named for its layers: **P**arallel **Sy**stems (PSy), **K**ernel, and **Al**gorithm. See [Separation of Concerns](#software-architecture) below.
 
 Science Model
-:   A library of code that simulates a particular science process, e.g. a radiation or land surface model. An LFRic application may use any number of Science Models.
+:   A library of code simulating a particular physical process (e.g. radiation, land-surface, microphysics). An LFRic application may use any number of Science Models layered on top of the core infrastructure.
 
-## GungHo Mathematical Notation
+LFRic Application
+:   Any program built on the LFRic Core infrastructure — including Momentum® Atmosphere and standalone test applications.
 
-*Source: "A glossary for GungHo formulation" (Met Office, 28 March 2014)*
+Modeldb
+:   An object in the LFRic infrastructure that encapsulates all the data needed to describe the full scientific and technical state of a running model — fields, meshes, parameters, and solver state.
 
-The notation follows ENDGame conventions where possible. Lower-case coding convention is used throughout; avoid distinguishing variables by case alone.
+## Atmospheric Modelling Concepts
+
+NWP (Numerical Weather Prediction)
+:   The use of mathematical models of the atmosphere, solved on computers, to forecast the weather. The Met Office runs NWP operationally multiple times a day.
+
+Dynamical Core
+:   The part of an atmospheric model that solves the fluid dynamics equations — momentum, continuity, and thermodynamics — on the resolved mesh. It is distinct from the *physics* schemes (see Parametrization). In LFRic, the dynamical core is GungHo.
+
+Parametrization (subgrid physics)
+:   Approximate representations of physical processes too small to be resolved by the mesh, such as cloud microphysics, convection, radiation, and surface exchange. These are coupled to the dynamical core via the Science Model layer.
+
+GCM (General Circulation Model)
+:   A global model whose domain covers the whole Earth. Contrasted with a LAM.
+
+LAM (Limited-Area Model)
+:   A regional model covering a sub-domain of the Earth, typically at higher resolution than a GCM for the same compute cost.
+
+Exner Pressure ($\Pi$)
+:   A non-dimensional pressure variable defined as $\Pi = (p/p_0)^{R/c_p}$. Used in atmospheric models because it simplifies the thermodynamic equations. Here $p_0$ is a reference surface pressure, $R$ is the gas constant for dry air, and $c_p$ is the specific heat at constant pressure.
+
+Potential Temperature ($\theta$)
+:   The temperature a parcel of air would have if brought adiabatically (without heat exchange) to a reference pressure $p_0$. It is conserved under dry adiabatic processes and is a key prognostic variable in atmospheric models.
+
+Exascale Computing
+:   Computing at or beyond $10^{18}$ floating-point operations per second. The motivation for LFRic's redesign: future HPC architectures will be radically different from current CPU-based machines, and the UM cannot be adapted to exploit them efficiently.
+
+Dennard Scaling
+:   The 1970s observation that as transistors shrank, their power density remained constant — so clock speeds could increase without extra power. Dennard scaling ended around 2005. Since then, performance gains come from more cores per chip rather than faster clocks, requiring models to parallelise more aggressively.
+
+Baroclinic Wave Test
+:   A standard benchmark for dynamical cores: a mid-latitude atmospheric disturbance that grows into a cyclone. Used in LFRic's scaling experiments on the C1944 and C576 cubed-sphere meshes.
+
+## Mesh and Spatial Discretisation
+
+### The Mesh
+
+Lat-Lon Grid
+:   A regular grid of latitude-longitude lines. Used in the UM/ENDGame but problematic at scale: longitude lines converge at the poles, creating a *polar singularity* where cells become arbitrarily small, forcing small time-steps and making load-balanced parallelisation difficult.
+
+Cubed-Sphere Mesh
+:   GungHo's quasi-uniform global mesh. A sphere approximated by six faces of a cube, each subdivided into quadrilateral cells. Avoids the polar singularity. The *equi-angular* variant used in LFRic has a maximum-to-minimum edge length ratio of only ~1.3, giving near-uniform resolution. Eight corner points where three cells meet replace the two poles.
+
+C-$n$ Notation
+:   Shorthand for cubed-sphere resolution: a C$n$ mesh has $n \times n$ cells per face of the cube, giving $6n^2$ columns total. C12 (864 columns) is used for diagrams; C576 and C1944 appear in scaling tests (~25 km and ~5 km global resolution respectively).
+
+Extruded Mesh
+:   The 3D mesh formed by extruding the 2D horizontal cubed-sphere mesh radially outward through the atmosphere. Each horizontal cell becomes a vertical column of cells. Where orography exists, a terrain-following coordinate is used so every column has the same number of layers.
+
+Column
+:   A single vertical stack of cells. Kernels in LFRic are written to operate on one column at a time; the PSy layer loops over all columns. Vertical data is stored contiguously in memory to offset the cost of indirect addressing in the horizontal.
+
+Global Mesh
+:   An object describing the entire 2D horizontal mesh, read from a UGRID-format file at model start-up.
+
+Local Mesh
+:   The sub-section of the Global Mesh assigned to a single MPI rank, together with partition-specific metadata.
+
+Mesh (3D)
+:   Formed from the Local Mesh by adding vertical extrusion. This is the object most LFRic infrastructure code works with.
+
+Mesh Entity
+:   A geometric primitive of the 3D mesh: 3D cell volumes, 2D faces, 1D edges, and 0D vertices. Different function spaces hold their degrees of freedom (DoFs) on different entities.
+
+InterMesh Map
+:   A lookup table mapping cell IDs in one 2D mesh to the overlapping cell IDs in another mesh. Used for multi-resolution or coupling configurations.
+
+Model Domain
+:   The geographic extent the model covers — global (GCM) or regional (LAM).
+
+### Finite Element Discretisation
+
+Mixed Finite Element Method (Mixed FEM)
+:   The spatial discretisation used in GungHo. Rather than placing all variables at cell centres (finite difference) or at vertices (classical FEM), the mixed FEM assigns different variables to different function spaces ($\mathbb{W}_0$–$\mathbb{W}_3$, see below). This gives the finite-element analogue of the Charney-Phillips staggering used in ENDGame, but without requiring mesh orthogonality — essential for the cubed-sphere.
+
+Function Space
+:   A set of basis functions spanning a space of field values on the mesh. In the mixed FEM, each prognostic variable lives in a specific function space that determines where its DoFs sit on the mesh and what continuity properties it has across cell boundaries.
+
+DoF (Degree of Freedom)
+:   A single scalar value that, together with its associated basis function, contributes to representing a field. Think of DoFs as the model's "data values". In a finite-difference model every DoF is at a grid-point cell centre; in LFRic's mixed FEM, DoFs are distributed across cell vertices, edges, faces, and centres depending on the function space. The total number of DoFs for a field is the main measure of problem size.
+
+Owned DoF
+:   A DoF that the local MPI rank is responsible for updating and owns the authoritative value for.
+
+Halo DoF
+:   A DoF physically located in a neighbouring rank's partition, stored locally as a read-only copy to allow stencil computations. Must be refreshed by a halo exchange whenever the owning rank updates it.
+
+Annexed DoF
+:   A DoF on an owned cell that is technically *owned* by a different rank — it lies on a cell boundary shared with that rank. Annexed DoFs are a subtlety of the unstructured-mesh partitioning: ownership is assigned per-DoF, not per-cell, so a cell can contain a mix of owned and annexed DoFs.
+
+### GungHo Function Spaces
+
+These are the five function spaces used by GungHo at lowest polynomial order ($p=0$). Each maps to a traditional atmospheric grid staggering:
+
+$\mathbb{W}_0$ ($Q_1$)
+:   Continuous 0-form scalars. DoFs sit at cell **vertices**. Analogous to stream-function points in spectral models.
+
+$\mathbb{W}_1$ ($N_0$, Nédélec space)
+:   Circulation 1-form vectors with **continuous tangential components** across faces. DoFs sit on cell **edges**. Holds vorticity $\boldsymbol{\zeta}$, $\boldsymbol{\xi}$.
+
+$\mathbb{W}_2$ ($RT_0$, Raviart-Thomas space)
+:   Flux 2-form vectors with **continuous normal components** across faces. DoFs sit on cell **faces**. Holds velocity $\mathbf{u}$ and mass flux $\mathbf{F}$. This is the analogue of the C-grid staggering for velocity.
+
+$\mathbb{W}_\theta$
+:   A scalar space for thermodynamic variables: horizontally discontinuous but vertically continuous. DoFs sit at the **top and bottom face centres** of a cell. Holds potential temperature $\theta$ and densities $\rho_X$. Mimics the Charney-Phillips vertical staggering.
+
+$\mathbb{W}_3$ ($Q_0^D$)
+:   Discontinuous volume 3-form scalars. DoFs sit at **cell centres** (one per cell). Holds density $\rho$, Exner pressure $\Pi$, and geopotential $\Phi$.
+
+C-Grid / Charney-Phillips Staggering
+:   A traditional grid staggering for atmospheric models: horizontal velocity at cell faces (C-grid), potential temperature at half-levels between pressure levels (Charney-Phillips). ENDGame uses this on a lat-lon grid. GungHo's $\mathbb{W}_2$/$\mathbb{W}_\theta$ mixed FEM reproduces the same staggering without relying on grid orthogonality.
+
+Raviart-Thomas Space ($RT_p$)
+:   A finite element space for vector fields ($\mathbb{W}_2$ in GungHo notation). Functions in $RT_p$ have continuous **normal** components across cell boundaries, making them appropriate for fluxes and velocities in conservation laws.
+
+Nédélec Space ($N_p$)
+:   A finite element space for vector fields ($\mathbb{W}_1$ in GungHo notation). Functions in $N_p$ have continuous **tangential** components across cell boundaries, appropriate for circulation-type quantities like vorticity.
+
+### Time-Stepping and Solvers
+
+Semi-Implicit Time-Stepping
+:   A time-integration strategy where fast-wave terms (acoustic, gravity waves) are treated implicitly and slow terms explicitly. This allows long time-steps without instability. GungHo uses a two-time-level iterative scheme.
+
+Picard Iteration
+:   The outer non-linear iteration within each time-step. At each Picard step, the non-linear and advection terms are updated, and then a linear system is solved for the increment to the prognostic variables. Typically 4 iterations per time-step.
+
+Krylov Subspace Method
+:   A class of iterative methods for solving large linear systems $Ax = b$. Rather than factorising $A$ directly, they build up a solution in the Krylov subspace spanned by $\{b, Ab, A^2b, \ldots\}$. Examples used in LFRic: Conjugate Gradient (CG), GMRES, BiCGStab, GCR.
+
+Helmholtz Operator
+:   The elliptic operator for the pressure (Exner function) system arising from the semi-implicit linearisation. Inverting it is the dominant cost of each time-step.
+
+Preconditioner
+:   A matrix $P \approx A$ used to transform the linear system $Ax=b$ into an equivalent problem $P^{-1}Ax = P^{-1}b$ that is cheaper to solve iteratively. In LFRic, the Helmholtz system uses a tensor-product multigrid preconditioner.
+
+Multigrid Preconditioner
+:   A preconditioner that solves the problem on a hierarchy of progressively coarser meshes, transferring corrections between levels. LFRic uses a *tensor-product* variant combining vertical line relaxation with horizontal multigrid, suited to the high-aspect-ratio (wide-but-thin) atmosphere cells.
+
+Schur Complement
+:   A technique to reduce a block linear system to a smaller problem in one of the variables. LFRic's pressure preconditioner reduces the full system to an elliptic problem for Exner pressure via an approximate Schur complement (with lumped velocity mass matrix).
+
+Mass Matrix
+:   In finite element methods, the matrix arising from applying a test function to a trial function: $M_{ij} = \langle \phi_i, \phi_j \rangle$. In the mixed FEM the mass matrices are not diagonal, so fields must be projected between function spaces by solving a small system — unlike finite-difference models where this is trivial.
+
+Advection
+:   Transport of a scalar (density $\rho$, potential temperature $\theta$) by the wind field $\mathbf{u}$. ENDGame uses a semi-Lagrangian scheme (follows fluid parcels backwards in time); GungHo replaces this with an Eulerian finite-volume method-of-lines scheme that is local (fixed stencil) and inherently mass-conserving.
+
+Semi-Lagrangian Advection
+:   An advection scheme that traces fluid parcel trajectories backwards in time to find where air came from, then interpolates. Allows large time-steps but requires non-local data lookups that are expensive near the poles of a lat-lon grid.
+
+## Parallelism and HPC
+
+MPI (Message Passing Interface)
+:   The standard library for distributed-memory parallelism on HPC clusters. Each MPI *rank* (process) has its own private memory and communicates with others by explicit message passing. LFRic partitions the horizontal mesh across MPI ranks.
+
+OpenMP
+:   A directive-based API for shared-memory threading. Within a single MPI rank, OpenMP threads share memory and can parallelise loops. LFRic uses *hybrid* MPI+OpenMP parallelism: each rank spawns multiple threads.
+
+Domain Decomposition / Partitioning
+:   Dividing the global mesh into sub-regions (partitions), one per MPI rank. Each rank owns the cells in its partition and stores a thin layer of *halo* cells from neighbouring partitions. LFRic's partitioner is optimised for cubed-sphere and planar meshes.
+
+Halo
+:   The extra layer(s) of cells surrounding a rank's local domain, storing copies of data from neighbouring ranks. Without halos, every stencil operation near a partition boundary would require inter-process communication; with halos, communication is batched into explicit *halo exchanges*.
+
+Halo Exchange
+:   An MPI communication step that copies updated field values from each rank that owns them into the halo regions of all neighbouring ranks. In LFRic, halo exchanges are tracked lazily: the infrastructure marks halos as *dirty* when the owning rank writes to a field, and a halo exchange is only triggered when a kernel actually needs the halo data.
+
+Dirty / Clean Halo
+:   A flag maintained per-field by the LFRic infrastructure. A halo is *dirty* if the owning rank has updated the field since the last halo exchange, meaning the local copy may be stale. PSyclone-generated code checks this flag before each kernel that reads halo data, performing an exchange only when necessary.
+
+Ghost Cell
+:   A special subset of cells at the very outermost edge of a halo, used only during mesh initialisation to resolve ownership of shared DoFs. Ghost cells are discarded after setup and never appear in active computation. Not to be confused with ordinary halo cells.
+
+Edge Cell
+:   A cell on the boundary of a rank's owned partition. It shares faces (and therefore DoFs) with halo cells on a neighbouring rank. Not to be confused with "edge DoFs" (DoFs located on cell edges in $\mathbb{W}_1$).
+
+Inner Halo
+:   A subset of owned cells that, for a stencil of depth $n$, can be computed *before* a halo exchange completes — because they are far enough from the partition boundary that they don't need halo data. Inner-halo cells enable *latency hiding*: computation and communication can overlap.
+
+Graph Colouring
+:   A technique for making OpenMP threading safe when DoFs are shared between cells. The mesh cells are coloured so that no two cells of the same colour share a DoF. Threads can then process all cells of one colour in parallel without write conflicts. PSyclone inserts the colouring loop automatically when needed.
+
+Redundant Computation
+:   Computing values for DoFs on shared mesh entities (faces, edges) from *both* the owned cell and the halo cell, rather than just the owner. This avoids one round of communication per kernel at the cost of slightly more arithmetic. With OpenMP, redundant computation is especially beneficial because larger per-rank domains (fewer ranks, more threads) mean the redundant fraction is smaller.
+
+Strong Scaling
+:   A scaling test where the total problem size is fixed and the number of processors increases. Ideal strong scaling halves wall-clock time each time the processor count doubles. LFRic shows good strong scaling to ~160,000 cores, after which per-rank domains become too small for efficient computation.
+
+Parallel Efficiency
+:   Strong scaling efficiency relative to a baseline: $E = T_{\mathrm{ref}} / (N_{\mathrm{rel}} \cdot T_N)$, where $N_{\mathrm{rel}}$ is the ratio of core counts. LFRic achieves ~70% efficiency at 157,366 cores versus 216 nodes on the Met Office Cray XC40.
+
+Global Sum
+:   An MPI all-reduce operation to compute a sum (or norm) across all ranks — e.g. checking solver convergence. Global sums become a bottleneck at very high core counts because every rank must participate and wait.
+
+## Software Architecture
+
+### PSyKAl Layers
+
+Separation of Concerns (SoC)
+:   The central design principle of LFRic: science code (what to compute) is kept strictly separate from parallel systems code (how to distribute and coordinate the computation). Scientists write algorithms and kernels; engineers write (or generate) the PSy layer. Changes to the hardware target require only changes to the PSy layer and PSyclone, not to the science.
+
+Algorithm Layer
+:   The top layer of PSyKAl. Scientists write algorithms as operations on global field objects using standard Fortran 2003. Kernels are invoked via `call invoke(...)` statements. This layer is parsed by PSyclone rather than compiled directly.
+
+PSy Layer (Parallel Systems Layer)
+:   The middle layer of PSyKAl, generated automatically by PSyclone. It contains the loops over horizontal cells, the halo exchange calls, the OpenMP directives, and the unpacking of LFRic field objects into raw data arrays for the kernels. Scientists never write PSy layer code directly.
+
+Kernel Layer
+:   The bottom layer of PSyKAl. A kernel is a pure Fortran subroutine that computes the local update for one column of cells. It receives simple arrays (no MPI, no objects) and knows nothing about parallelism. Each kernel is accompanied by *metadata* (Fortran derived-type annotations) that tells PSyclone what data it accesses and how.
+
+Invoke
+:   The mechanism by which the algorithm layer calls into the PSy layer. `call invoke(kernel1(...), kernel2(...))` is a syntactic marker — it does not exist as a real Fortran procedure. PSyclone replaces each invoke with a generated PSy subroutine call that loops over cells and handles parallelism.
+
+Kernel Metadata
+:   Fortran derived-type annotations embedded in each kernel module, specifying: the type of each argument (field, operator, scalar), the access pattern (read, write, readwrite, increment), and the function space each field lives on. PSyclone reads this metadata to generate correct halo exchanges and loop bounds.
+
+Operator
+:   An LFRic object representing a linear mapping between two function spaces — essentially a sparse matrix in the FEM sense. Operators appear as arguments to kernels. Example: a mass matrix mapping $\mathbb{W}_2 \to \mathbb{W}_2$.
+
+Built-in Kernel
+:   A simple element-wise operation provided by PSyclone itself (e.g. `setval_c` to set all field values to a scalar, or field addition). Built-ins are generated inline in the PSy layer and require no kernel metadata.
+
+Domain-Specific Language (DSL)
+:   A programming language or API designed for a narrow problem domain. The PSyKAl API, metadata, and PSyclone together form a DSL for finite-element/volume/difference earth-system models. Other DSLs in weather/climate: STELLA, GridTools, Firedrake.
+
+Abstract Syntax Tree (AST)
+:   PSyclone's internal tree representation of parsed Fortran source. PSyclone modifies the AST — inserting halo exchange calls, replacing invoke statements, adding OpenMP directives — then serialises it back to Fortran.
+
+### Infrastructure Objects
+
+Field
+:   The primary data object in LFRic: a discretised scalar or vector quantity living on a particular function space. Accessed via a proxy object in PSy-layer code; the field object owns its own read/write methods (including XIOS I/O).
+
+Function Space (software object)
+:   An LFRic infrastructure object encapsulating all the mesh connectivity information associated with a particular function space: the number of DoFs, their global indices, the `map` arrays used for cell-to-DoF indirection, and basis function values.
+
+Proxy Object
+:   In the PSy layer, field and operator objects are accessed via proxies that expose raw data arrays. This allows PSyclone-generated code to work with simple Fortran arrays while the higher-level field abstraction is preserved in the algorithm layer.
+
+## Infrastructure Libraries
+
+XIOS (XML I/O Server)
+:   A client-server parallel I/O framework developed at IPSL (Institut Pierre Simon Laplace). XIOS runs dedicated I/O server processes asynchronously alongside the model compute processes, handling NetCDF/HDF5 output without stalling computation. Configured via XML files; supports time-averaging, regridding, and UGRID-formatted unstructured output.
+
+UGRID Convention
+:   A NetCDF metadata convention for storing unstructured mesh topology alongside field data. LFRic adopted UGRID as its primary mesh format because XIOS's existing CF/NetCDF support did not handle fields on mesh edges and faces — IPSL added UGRID support to XIOS in 2016 in collaboration with the Met Office.
+
+CF Conventions (Climate and Forecast)
+:   Widely-used metadata conventions for NetCDF files in the climate community. Define standard variable names, units, and coordinate systems. UGRID extends CF to unstructured grids.
+
+YAXT (Yet Another eXchange Tool)
+:   A lightweight MPI communication library for halo exchanges, developed at DKRZ (German Climate Computing Centre). Replaced ESMF in LFRic after being found equally fast but far simpler to integrate. Generates communication routing tables at initialisation that are reused every time-step.
+
+ESMF (Earth System Modelling Framework)
+:   A framework providing infrastructure for Earth system model components. Initially used in LFRic for halo exchanges, but replaced by YAXT as ESMF was a heavyweight dependency for what LFRic actually used from it.
+
+OASIS
+:   An open-source coupling framework for passing fields between separately running model components (e.g. atmosphere and ocean). LFRic includes OASIS-MCT coupling infrastructure for coupled simulations; XIOS is also compatible with OASIS.
+
+Rose / Cylc
+:   The workflow management tools used to run LFRic suites. **Rose** manages the suite metadata and configuration; **Cylc** is the scheduler that submits and monitors tasks on HPC systems. Suites live in `rose-stem/` directories within lfric_core and lfric_apps.
+
+PSyclone Transformation
+:   A Python API call that modifies PSyclone's internal schedule (AST of the PSy layer) before code generation. Transformations apply optimisations: loop colouring for OpenMP safety, OpenMP `parallel do` insertion, OpenACC offloading, loop fusion, or increased redundant computation depth. An HPC expert writes a short Python script of transformations; the science code is untouched.
+
+## GungHo Mathematical Reference
+
+*Source: "A glossary for GungHo formulation" (Met Office, 28 March 2014) and Adams et al. 2019.*
+
+### Governing Equations
+
+GungHo solves the rotating Euler equations for a perfect dry gas:
+
+$$\frac{\partial\mathbf{u}}{\partial t} = -(2\boldsymbol{\Omega}+\nabla\times\mathbf{u})\times\mathbf{u} - \nabla\!\left(\tfrac{1}{2}\mathbf{u}\cdot\mathbf{u} + \Phi\right) - c_p\theta\nabla\Pi$$
+
+$$\frac{\partial\theta}{\partial t} = -\mathbf{u}\cdot\nabla\theta, \qquad \frac{\partial\rho}{\partial t} = -\nabla\cdot(\mathbf{u}\rho)$$
+
+closed by the equation of state $\Pi^{(1-\kappa)/\kappa} = (R/p_0)\rho\theta$.
+
+The prognostic variables are $\mathbf{u}$ (velocity), $\theta$ (potential temperature), $\rho$ (density), and $\Pi$ (Exner pressure).
 
 ### Physical Constants
 
@@ -92,47 +335,38 @@ The notation follows ENDGame conventions where possible. Lower-case coding conve
 | Mol. weight ratio, water/dry air | $\varepsilon$ | $0.62198$ | dimensionless |
 | Gas constant, water vapour | $R_v = R_d/\varepsilon$ | $461.5$ | J kg$^{-1}$ K$^{-1}$ |
 
-### Function Spaces (Mixed Finite-Element Discretisation)
+### Variables and Function Spaces
 
-| Space | Role |
-|---|---|
-| $\mathbb{W}_0$ | 0-form scalars (continuous) |
-| $\mathbb{W}_1$ | Circulation 1-form vectors |
-| $\mathbb{W}_2$ | Flux 2-form vectors |
-| $\mathbb{W}_\theta$ | Scalar space (buoyancy, potential temperature, densities) |
-| $\mathbb{W}_3$ | Volume 3-form scalars (discontinuous) |
+| Variable | Symbol | Space | Physical meaning |
+|---|---|---|---|
+| Velocity vector | $\mathbf{u}$ | $\mathbb{W}_2$ ($RT_0$) | Wind field; DoFs on cell faces |
+| Mass flux | $\mathbf{F}$ | $\mathbb{W}_2$ | $\mathbf{F} = \mathbf{u}\rho$ |
+| Absolute vorticity | $\boldsymbol{\zeta}$ | $\mathbb{W}_1$ ($N_0$) | DoFs on cell edges |
+| Relative vorticity | $\boldsymbol{\xi}$ | $\mathbb{W}_1$ | $\boldsymbol{\xi} = \nabla\times\mathbf{u}$ |
+| Potential temperature | $\theta_{vd}$ | $\mathbb{W}_\theta$ | DoFs at top/bottom face centres |
+| Densities | $\rho_X$ | $\mathbb{W}_\theta$ | Species densities |
+| Mixing ratios | $m_X$ | $\mathbb{W}_\theta$ | Water vapour, liquid, ice, etc. |
+| Exner pressure | $\Pi$ | $\mathbb{W}_3$ ($Q_0^D$) | Non-dimensional pressure; DoFs at cell centres |
+| Dry density | $\rho_d$ | $\mathbb{W}_3$ | |
+| Geopotential | $\Phi$ | $\mathbb{W}_3$ | $\Phi = gz$ |
+| Kinetic energy | $K$ | — | $K = \tfrac{1}{2}\mathbf{u}\cdot\mathbf{u}$ |
+| Vorticity flux | $\mathbf{Q}$ | — | $(2\boldsymbol{\Omega}+\boldsymbol{\xi})\times\mathbf{u}$ |
+| Coords (horiz, horiz, vert) | $(\chi_1,\chi_2,\chi_3)$ | — | General orthogonal |
+| Terrain-following coord | $\eta$ | — | Transformed vertical |
+| Exner at reference | $\hat{\Pi}$ | — | Hat = reference-cell quantity |
 
-### Variables and Trial Functions
+### Basis Functions and Inner-Product Notation
 
-| Description | Symbol | Space |
-|---|---|---|
-| General orthogonal coords (horiz, horiz, vert) | $(\chi_1, \chi_2, \chi_3)$ | — |
-| Terrain-following vertical coordinate | $\eta$ | — |
-| Exner pressure function | $\Pi$ | $\mathbb{W}_3$ |
-| Kinetic energy per unit mass | $K$ | — |
-| Vorticity flux | $\mathbf{Q}$ | — |
-| Absolute vorticity | $\boldsymbol{\zeta}$ | $\mathbb{W}_1$ |
-| Relative vorticity | $\boldsymbol{\xi}$ | $\mathbb{W}_1$ |
-| Velocity vector | $\mathbf{u}$ | $\mathbb{W}_2$ |
-| Mass flux | $\mathbf{F}$ | $\mathbb{W}_2$ |
-| Potential temperature | $\theta_{vd}$ | $\mathbb{W}_\theta$ |
-| Densities | $\rho_X$ | $\mathbb{W}_\theta$ |
-| Mixing ratios | $m_X$ | $\mathbb{W}_\theta$ |
-| Dry density | $\rho_d$ | $\mathbb{W}_3$ |
-| Geopotential | $\Phi$ | $\mathbb{W}_3$ |
-
-### Basis Functions
-
-For a variable expanded over basis functions $\{f_i\}$ spanning function space $\mathbb{W}$ on the reference cell, subscript $i$ indexes individual basis functions:
+Any field $f$ in space $\mathbb{W}$ is expanded as $f = \sum_i f_i \phi_i$ where $\phi_i$ are the basis functions and $f_i$ are the DoF coefficients.
 
 | Space | Basis function symbol |
 |---|---|
 | $\mathbb{W}_0$ | $\gamma_i$ |
 | $\mathbb{W}_1$ | $\mathbf{c}_i$ (circulation) |
 | $\mathbb{W}_2$ | $\mathbf{v}_i$ |
-| $\mathbb{W}_\theta$ | $w_i$ (= vertical component of $\mathbf{v}$) |
+| $\mathbb{W}_\theta$ | $w_i$ (vertical component of $\mathbf{v}$) |
 | $\mathbb{W}_3$ | $\sigma_i$ |
 
-The inner-product notation $\langle a, b \rangle$ denotes application of test function $a$ to trial function $b$ followed by volume integration over the entire domain (dot product implied when both are vectors).
+The notation $\langle a, b \rangle$ denotes application of test function $a$ to trial function $b$ followed by volume integration over the whole domain (dot product when both are vectors). The space of the test function is always specified: e.g. $\langle \psi, \partial\rho/\partial t \rangle + \langle \psi, \nabla\cdot\mathbf{F} \rangle = 0\;\;\forall\,\psi\in\mathbb{W}_3$.
 
 Dual-grid quantities are indicated by an overline on all relevant variables and basis functions.
