@@ -29,19 +29,19 @@ After cloning: `git submodule update --init --recursive`
 
 ## Building the Website
 
-Uses [pixi](https://pixi.sh) for environment management:
+Quarto source lives in `src/`; output is rendered to `docs/`. Uses [pixi](https://pixi.sh) for environment management:
 
 ```bash
 pixi run serve    # live-reload preview at http://localhost:8042
-pixi run build    # render to docs/
+pixi run build    # render src/ to docs/
 pixi run clean    # remove docs/
 ```
 
 Without pixi, requires `quarto` on PATH:
 
 ```bash
-quarto preview --port 8042
-quarto render
+quarto preview src --port 8042
+quarto render src
 ```
 
 ## Key Institutional Context

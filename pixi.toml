@@ -12,6 +12,6 @@ quarto = "*"
 env = { QUARTO_PORT = "8042" }
 
 [tasks]
-build = { cmd = "quarto render", description = "Render the Quarto project" }
-serve = { cmd = "quarto preview --port $QUARTO_PORT", description = "Serve the Quarto site on port 8042" }
+build = { cmd = "quarto render src", description = "Render the Quarto project" }
+serve = { cmd = "quarto preview src --port $QUARTO_PORT", description = "Serve the Quarto site on port 8042" }
 clean = { cmd = "rm -rf docs", description = "Remove the Quarto build output" }
