@@ -13,5 +13,5 @@ env = { QUARTO_PORT = "8042" }
 
 [tasks]
 build = { cmd = "quarto render src", description = "Render the Quarto project" }
-serve = { cmd = "quarto preview src --port $QUARTO_PORT --host 0.0.0.0", description = "Serve the Quarto site on port 8042" }
+serve = { cmd = "quarto preview src --port $QUARTO_PORT --host 0.0.0.0", description = "Serve the Quarto site on port QUARTO_PORT" }
 clean = { cmd = "rm -rf docs", description = "Remove the Quarto build output" }
