@@ -5,6 +5,9 @@ project:
 website:
   title: "LFRic Wiki"
   description: "Personal wiki for LFRic RSE work with Met Office"
+  search:
+    location: navbar
+    type: overlay
   navbar:
     left:
       - href: index.qmd
@@ -22,5 +25,7 @@ website:
 
 format:
   html:
-    theme: bootstrap
+    theme: cosmo
     toc: true
+    toc-depth: 3
+    html-math-method: katex
