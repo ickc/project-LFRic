@@ -1,0 +1,138 @@
+---
+title: "Glossary"
+---
+
+Terms and notation drawn from the LFRic submodules.
+Sources: `submodules/lfric_core/documentation/source/glossary.rst`, `submodules/lfric_apps/documentation/source/glossary.rst`, and `submodules/lfric_apps/science/gungho/documentation/glossary/glossary.latex`.
+
+## LFRic Infrastructure Terms
+
+*Source: LFRic Core glossary*
+
+Annexed DoF
+:   DoFs on owned cells that are actually owned by another rank that shares them.
+
+Checkpoint Dump
+:   A persistent snapshot of model state written to disk, used to restart a run from a known point. See LFRic Apps documentation for the checkpoint index.
+
+Data Model
+:   LFRic core infrastructure which provides the framework for working with data objects supporting LFRic Science Model(s).
+
+DoF (Degree of Freedom)
+:   DoFs describe the state of a field. They typically correspond to the value of the field at specific locations in the mesh (although they don't have to), so are equivalent to data values in finite difference models.
+
+Edge Cell
+:   Cells that lie on the boundary of a partition. They contain DoFs that are shared with halo cells. Not to be confused with "edge DoFs", which are the DoFs that lie on the edges of a cell.
+
+Ghost Cell
+:   A special subset of cells used during initialisation to determine ownership of shared degrees of freedom (DoFs) on the outer faces, edges, or vertices of the outermost halo cells. They are not part of the active computation and are discarded after the initialisation phase. Note: ghost cells are **not** the same as halo cells.
+
+Global DoF Index
+:   A unique identifier for every DoF. Every partition uses the same global DoF index for the same DoF. If four partitions share a DoF, each partition knows how to identify that DoF and its owner.
+
+Global Mesh
+:   An object describing a 2D mesh which encompasses the entirety of an LFRic application's Model Domain.
+
+Halo
+:   Extra layers of cells surrounding a processor's local domain. These halo cells store data from neighbouring domains, enabling each processor to perform calculations that depend on adjacent values without needing constant inter-processor communication.
+
+Halo DoF
+:   DoFs on halo cells that are owned by other ranks.
+
+Inner Halo
+:   A subset of owned cells used for supporting computation while communication is still ongoing. If a stencil operation requires $n$ halo layers of data, then calculations in cells up to $n$ inner halos are affected by halo data. Any cells from inner halo $(n+1)$ onwards can be computed before or during a halo exchange.
+
+InterMesh Map
+:   Mapping between 2D-mesh cell IDs from source to target meshes. The mapping lists the cell IDs (local to the target mesh) that geographically overlap a given cell ID in the source mesh.
+
+LFRic Application
+:   A program that uses the LFRic infrastructure (Core and/or Apps).
+
+Local Mesh
+:   An object describing a 2D mesh encompassing a sub-section (partition) of a Global Mesh. In addition to the information held by a Global Mesh, it stores partition information unique to its intended process rank.
+
+Mesh
+:   An object describing a 3D mesh encompassing a sub-section (partition) of the Global Mesh. Derived from the corresponding Local Mesh object for a given process rank and an extrusion object configured by an LFRic application.
+
+Mesh Entity
+:   A fundamental geometric component of the computational mesh, comprising: 3D volumes, 2D faces, 1D edges, and 0D vertices.
+
+Model Domain
+:   The geographical domain extents to which an LFRic application is configured, e.g. GCM (global), LAM (limited-area).
+
+Modeldb
+:   An object that encapsulates all the data required to describe both the scientific and technical state of a model.
+
+Owned DoF
+:   DoFs on owned cells that are owned by the local rank.
+
+Partitioning
+:   Dividing a system's computational domain (including data and workload) into smaller sections (partitions) that can be processed in parallel.
+
+Science Model
+:   A library of code that simulates a particular science process, e.g. a radiation or land surface model. An LFRic application may use any number of Science Models.
+
+## GungHo Mathematical Notation
+
+*Source: "A glossary for GungHo formulation" (Met Office, 28 March 2014)*
+
+The notation follows ENDGame conventions where possible. Lower-case coding convention is used throughout; avoid distinguishing variables by case alone.
+
+### Physical Constants
+
+| Description | Symbol | Value | Units |
+|---|---|---|---|
+| Earth's mean radius | $a$ | $6{,}371{,}229.0$ | m |
+| Surface equatorial gravity | $g_a$ | $9.80665$ | m s$^{-2}$ |
+| Earth's rotation rate | $|\boldsymbol{\Omega}|$ | $7.292116 \times 10^{-5}$ | s$^{-1}$ |
+| Reference surface pressure | $p_0$ | $100{,}000.0$ | Pa |
+| Gas constant, dry air | $R_d$ | $287.05$ | J kg$^{-1}$ K$^{-1}$ |
+| Specific heat, dry air (const. pressure) | $c_{pd}$ | $1005.0$ | J kg$^{-1}$ K$^{-1}$ |
+| $\kappa_d = R_d / c_{pd}$ | $\kappa_d$ | $0.2856$ | dimensionless |
+| Mol. weight ratio, water/dry air | $\varepsilon$ | $0.62198$ | dimensionless |
+| Gas constant, water vapour | $R_v = R_d/\varepsilon$ | $461.5$ | J kg$^{-1}$ K$^{-1}$ |
+
+### Function Spaces (Mixed Finite-Element Discretisation)
+
+| Space | Role |
+|---|---|
+| $\mathbb{W}_0$ | 0-form scalars (continuous) |
+| $\mathbb{W}_1$ | Circulation 1-form vectors |
+| $\mathbb{W}_2$ | Flux 2-form vectors |
+| $\mathbb{W}_\theta$ | Scalar space (buoyancy, potential temperature, densities) |
+| $\mathbb{W}_3$ | Volume 3-form scalars (discontinuous) |
+
+### Variables and Trial Functions
+
+| Description | Symbol | Space |
+|---|---|---|
+| General orthogonal coords (horiz, horiz, vert) | $(\chi_1, \chi_2, \chi_3)$ | — |
+| Terrain-following vertical coordinate | $\eta$ | — |
+| Exner pressure function | $\Pi$ | $\mathbb{W}_3$ |
+| Kinetic energy per unit mass | $K$ | — |
+| Vorticity flux | $\mathbf{Q}$ | — |
+| Absolute vorticity | $\boldsymbol{\zeta}$ | $\mathbb{W}_1$ |
+| Relative vorticity | $\boldsymbol{\xi}$ | $\mathbb{W}_1$ |
+| Velocity vector | $\mathbf{u}$ | $\mathbb{W}_2$ |
+| Mass flux | $\mathbf{F}$ | $\mathbb{W}_2$ |
+| Potential temperature | $\theta_{vd}$ | $\mathbb{W}_\theta$ |
+| Densities | $\rho_X$ | $\mathbb{W}_\theta$ |
+| Mixing ratios | $m_X$ | $\mathbb{W}_\theta$ |
+| Dry density | $\rho_d$ | $\mathbb{W}_3$ |
+| Geopotential | $\Phi$ | $\mathbb{W}_3$ |
+
+### Basis Functions
+
+For a variable expanded over basis functions $\{f_i\}$ spanning function space $\mathbb{W}$ on the reference cell, subscript $i$ indexes individual basis functions:
+
+| Space | Basis function symbol |
+|---|---|
+| $\mathbb{W}_0$ | $\gamma_i$ |
+| $\mathbb{W}_1$ | $\mathbf{c}_i$ (circulation) |
+| $\mathbb{W}_2$ | $\mathbf{v}_i$ |
+| $\mathbb{W}_\theta$ | $w_i$ (= vertical component of $\mathbf{v}$) |
+| $\mathbb{W}_3$ | $\sigma_i$ |
+
+The inner-product notation $\langle a, b \rangle$ denotes application of test function $a$ to trial function $b$ followed by volume integration over the entire domain (dot product implied when both are vectors).
+
+Dual-grid quantities are indicated by an overline on all relevant variables and basis functions.
