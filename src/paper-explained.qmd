@@ -1,0 +1,304 @@
+---
+title: "The LFRic Paper, from the Ground Up"
+subtitle: "A personal note for the mathematically conversant but possibly rusty"
+---
+
+A companion to [Adams et al. (2019), arXiv:1809.07267](https://arxiv.org/abs/1809.07267) (source in [`submodules/arXiv-1809.07267/`](paper.qmd)). It is not a summary — the paper is short and you will read it. Instead it rebuilds the content from the ground up, in dependency order rather than the paper's order: mesh → function spaces → data model → time → solver → parallelism → compiler. Facts and numbers are from the paper unless marked *(gloss)*; the bridges into CMB data analysis, statistics, and JAX are mine. For term lookup, use the [glossary](glossary.qmd); a reading map back to the paper's sections is at the end.
+
+**The essence.** LFRic makes one design move, twice: *declare the structure explicitly, then derive the dangerous parts mechanically.* In the numerics, the declared structure is the de Rham complex of the governing equations — encode it in the finite element spaces and conservation laws hold by construction (§4). In the software, the declared structure is each kernel's data-dependence — encode it in metadata and a compiler generates the parallel code (§9). The first bet buys *scalability*, the second buys *performance portability*; the paper's title is exactly these two words.
+
+---
+
+## 1. The shape of the problem
+
+An atmospheric model splits into a **dynamical core** — the discretised fluid dynamics of the resolved flow — and **physics parametrizations**, closure models for everything below the mesh cutoff (clouds, convection, radiation)[^closure]. The paper concerns only the dry dynamical core, called **GungHo**, and the infrastructure built to host it, called **LFRic**[^names].
+
+Formally, the dynamical core is a deterministic map: the state $\mathbf{x} = (\mathbf{u}, \theta, \rho, \Pi)$ is a point in a product of function spaces over a thin spherical shell, and one timestep is a map $\Phi_{\Delta t}: \mathbf{x}^n \mapsto \mathbf{x}^{n+1}$. Where is the statistics? Outside this paper, but it is why the paper exists: operationally the core is the *forward model* of a Bayesian filtering cycle (data assimilation re-estimates the state from observations every few hours, the core pushes it forward, ensembles Monte-Carlo the pushforward)[^fourdvar]. A forecast competes with the weather itself, so the wall-clock budget per forecast is fixed: what matters is **strong scaling** — time-to-solution at fixed problem size — not throughput. Hold that thought for §10.
+
+The paper opens with three exogenous pressures on the existing Unified Model (UM, operational since 1990):
+
+1. **Hardware stopped giving free speed.** Dennard scaling ended around 2005; per-core clocks stalled and parallelism per socket exploded[^dennard]. Serial-friendly code now buys performance only through more cores — if it can use them.
+2. **The lat-lon grid concentrates pathology at the poles** (§2). This is the UM's scalability ceiling, and it is a property of the *coordinates*, not the physics.
+3. **Architectures diversified** (GPUs, many-core), and each port of a million-line Fortran model re-tunes or rewrites code. The science code must stop knowing about machines (§9).
+
+Pressure 2 forces a new mesh; a new mesh forces new numerics (the UM's finite differences assume the grid's orthogonality) and a new infrastructure (the UM's code assumes the grid's regular indexing). Hence: rebuild both, and while rebuilding, fix pressure 3 by design.
+
+[^closure]: In renormalisation language: the mesh imposes a UV cutoff; parametrizations are the effective theory of the integrated-out scales, with coefficients fitted rather than derived. "Prognostic" variables are the evolved state $\mathbf{x}$; "diagnostic" quantities are derived functionals of it — meteorology's words for state vs. derived.
+
+[^names]: **LFRic** honours Lewis Fry Richardson, who in 1922 attempted the first numerical forecast by hand and imagined a "forecast factory": 64,000 human computers in an amphitheatre, a conductor coordinating them with coloured lights — message-passing parallelism avant la lettre. His trial forecast failed spectacularly (a 145 hPa surface-pressure rise in 6 h) because unbalanced initial data excited fast gravity-wave modes — *precisely the modes the semi-implicit scheme of §6 is built to tame*. The name is a thesis statement. **GungHo** is the dynamical-core project (Met Office + NERC + STFC); the name is the Chinese 工合 *gōnghé*, "work together" (adopted into English via the US Marines in WWII). It replaces **ENDGame** ("Even Newer Dynamics for General atmospheric modelling of the environment"), the UM's current core.
+
+[^fourdvar]: 4D-Var, the Met Office's assimilation method, is MAP estimation: maximise a posterior over the initial state with a Gaussian prior (the "B-matrix" — a hand-modelled covariance, the part of NWP closest to CMB likelihood work) and an observation likelihood threaded through the forward model. The gradient comes from the adjoint model — reverse-mode autodiff, historically derived and coded by hand. The current code base makes this concrete: `lfric_apps` ships an `adjoint_tests` application, and PSyclone (§9) has a component, PSyAD, that generates kernel adjoints mechanically.
+
+[^dennard]: Dennard et al. (1974): as MOSFETs shrink, voltage and current scale down with feature size, so power density stays constant — shrink ⇒ faster clocks at equal power. Leakage currents broke this around 2005. Since then transistor counts still grow (Moore) but clocks do not; the surplus goes into cores. The UM rode the clock; LFRic must ride the cores.
+
+---
+
+## 2. Sampling the sphere
+
+You know this design problem from the other end: it is sky pixelisation. A latitude–longitude grid (the UM's choice, CMB's "equirectangular projection") has zonal cell width $a\cos\varphi\,\Delta\lambda \to 0$ at the poles. For an explicit PDE solver the smallest cell sets the global timestep through the CFL condition $\Delta t \lesssim \Delta x_{\min}/c_{\max}$[^cfl], so polar cells throttle the entire planet. The UM escapes via semi-Lagrangian advection (§6), which is stable for long steps but needs *non-local* data — near the poles a parcel trajectory crosses many processors' domains in one step, so the stability fix becomes a communication hot-spot. Either way the poles, a pure coordinate artefact, dominate the error budget and the communication budget.
+
+CMB solved this with HEALPix (equal-area pixels for uniform noise, iso-latitude rings for fast spherical-harmonic transforms). GungHo's objective function is different: no SHTs are ever taken[^spectral] — what matters is *locality* (stencil neighbours for halo exchange) and *quasi-uniformity* (CFL, load balance). The solution is the **equi-angular cubed sphere**: project a cube onto the sphere, divide each panel into $n \times n$ quadrilaterals — a "C$n$" mesh has $6n^2$ columns (C12 = 864 columns in the paper's Fig. 1; the scaling runs use C1944 ≈ 5 km resolution). You have met this mesh before: it is COBE's quadrilateralized spherical cube, reinvented for PDEs[^quadcube].
+
+The price of quasi-uniformity (max/min edge ratio ≈ 1.3) is twofold:
+
+- **Orthogonality is lost**: the line joining adjacent cell centres is no longer perpendicular to their shared edge. Classical staggered finite differences rely on that perpendicularity for consistency; this single fact forces the finite element method of §4.
+- **Eight corner singularities** where three cells meet instead of four. These are unremovable: for any all-quadrilateral mesh of the sphere, $\sum_v (4 - \deg v) = 4\chi(S^2) = 8$, so a total topological defect of 8 must sit somewhere; the cube concentrates it minimally as eight valence-3 corners *(gloss)*[^defect]. The numerics must merely not amplify errors there — another constraint pointing at FEM.
+
+The 3D mesh is the 2D mesh **extruded** radially: every column has the same number of layers (terrain-following coordinates near orography[^terrain]). This makes the mesh a product: *horizontally unstructured × vertically structured* — the single most consequential data-layout fact in LFRic (§5).
+
+[^cfl]: Courant–Friedrichs–Lewy (1928 — proved as a step in an *existence* proof for PDEs, long before computers): an explicit scheme is stable only if its numerical domain of dependence contains the physical one, i.e. information must not need to travel more than one stencil width per step: $c\,\Delta t \lesssim \Delta x$.
+
+[^spectral]: The other road, taken by ECMWF's IFS: spectral transform models represent fields in spherical harmonics, where derivatives and the implicit solve (§7) are diagonal — but every timestep does global Legendre transforms, whose all-to-all communication is *their* anticipated exascale ceiling. Grid-point locality vs. spectral diagonality is the same trade CMB faces between map-space and harmonic-space operations; NWP at exascale is betting on map-space.
+
+[^quadcube]: The quadrilateralized spherical cube (Chan & O'Neill 1975) carried COBE's maps before HEALPix existed; the equi-angular variant for PDEs traces to Sadourny (1972) and Ronchi et al. (1996). The projections differ in detail (COBE's tweaked for equal area; equi-angular for uniform angles, better for CFL), but the topology — and the eight corners — are identical.
+
+[^defect]: Count for a closed all-quad mesh: $2E = 4F$, so $\chi = V - E + F = V - F = 2$, hence $\sum_v(4-\deg v) = 4V - 2E = 4(V-F) = 8$. The lat-lon mesh dodges the theorem by not being all-quad — its polar cells degenerate to triangles, which is exactly where its trouble lives. Same accounting as disclination defects in 2D crystals on curved surfaces, where the Euler characteristic forces twelve pentagons into every fullerene.
+
+[^terrain]: The vertical coordinate follows the terrain at the bottom and relaxes to spherical shells aloft, so "level $k$" is a smooth deformation of a sphere, and every column has `nlayers` cells. Keeping the column count uniform is what keeps the vertical direction structured and directly addressable.
+
+---
+
+## 3. The state and its equations
+
+GungHo solves the dry, fully compressible Euler equations in a rotating frame:
+
+$$
+\begin{aligned}
+\frac{\partial\mathbf{u}}{\partial t} &= -\left(2\boldsymbol{\Omega}+\nabla\times\mathbf{u}\right)\times\mathbf{u} - \nabla\!\left(\tfrac{1}{2}\mathbf{u}\cdot\mathbf{u} + \Phi\right) - c_p\,\theta\,\nabla\Pi,\\[2pt]
+\frac{\partial\theta}{\partial t} &= -\mathbf{u}\cdot\nabla\theta,\\[2pt]
+\frac{\partial\rho}{\partial t} &= -\nabla\cdot(\rho\mathbf{u}),
+\end{aligned}
+\qquad\qquad
+\Pi^{\frac{1-\kappa}{\kappa}} = \frac{R}{p_0}\,\rho\,\theta .
+$$
+
+The state is $\mathbf{x} = (\mathbf{u}, \theta, \rho, \Pi)$: wind, potential temperature, density, Exner pressure, with $\kappa = R/c_p \approx 2/7$. Three reading notes:
+
+- The momentum equation is in **vector-invariant form**[^vecinv]: the advection term is rewritten so that the rotation enters only through the *total* vorticity $2\boldsymbol{\Omega} + \nabla\times\mathbf{u}$ — Coriolis is not a separate force, just the planetary share of the vorticity. This is also why vorticity gets its own function space in §4.
+- The thermodynamic pair $(\theta, \Pi)$ replaces $(T, p)$. $\theta = T(p_0/p)^{\kappa}$ is the temperature after adiabatic compression to reference pressure — an entropy label ($s = c_p\ln\theta + \text{const}$), hence *materially conserved*: its equation is pure advection. And the pressure-gradient force becomes exactly $\rho^{-1}\nabla p = c_p\theta\nabla\Pi$[^pgf] — bilinear in the state, which is precisely what the linearisation in §6 wants.
+- Nothing here is hyperdiffusive, stochastic, or parametrized: this is the conservative core. All the difficulty is that the system carries acoustic and gravity waves ~an order of magnitude faster than the winds that constitute weather — the stiffness that drives §6 and §7.
+
+[^vecinv]: From the identity $(\mathbf{u}\cdot\nabla)\mathbf{u} = \nabla\tfrac{1}{2}|\mathbf{u}|^2 - \mathbf{u}\times(\nabla\times\mathbf{u})$. The kinetic energy joins the geopotential $\Phi$ in one gradient, and the remaining nonlinearity $(2\boldsymbol{\Omega}+\boldsymbol{\xi})\times\mathbf{u}$ is the "vorticity flux" — a 1-form-valued term, naturally discretised with $\boldsymbol{\xi} \in \mathbb{W}_1$ (§4).
+
+[^pgf]: Two lines, exact for an ideal gas: $\nabla\Pi = \kappa\Pi\,\nabla p/p$, so $c_p\theta\nabla\Pi = c_p\kappa\,(T/\Pi)\,\Pi\,\nabla p/p = RT\,\nabla p/p = \rho^{-1}\nabla p$. No approximation — the $(\theta,\Pi)$ variables are chosen so the worst nonlinearity of the primitive form factorises.
+
+---
+
+## 4. Where fields live: compatible finite elements
+
+This is the mathematical heart of the paper, compressed there into one paragraph of §3.2. Ground-up version:
+
+**Weak formulation as estimating equations.** A Galerkin method picks a finite-dimensional subspace $V_h = \mathrm{span}\{\phi_i\} \subset V$ and, since the PDE residual cannot vanish pointwise within a model class, demands instead that it vanish against every test function: $\langle \phi_i, R(\mathbf{x}_h)\rangle = 0\;\forall i$. That is a method-of-moments move: match a finite family of test statistics, not the full distribution. Derivatives are moved onto test functions by parts, so only *integrals over cells* are ever evaluated — nothing requires the mesh to be orthogonal, which is exactly the robustness the cubed sphere needs *(gloss; the paper states the conclusion)*.
+
+**The price: the Gram matrix.** Expanding $f = \sum_i f_i\phi_i$, every projection involves the **mass matrix** $M_{ij} = \langle\phi_i,\phi_j\rangle$ — the Gram matrix of a non-orthogonal basis. In finite differences the basis is implicitly orthonormal (one indicator per cell), $M = I$, and you never notice it. In FEM, overlapping bases make $M$ sparse but *non-diagonal*: even converting between "function values" and "coefficients" costs a linear solve. You have seen this object before: it is the mode-coupling matrix of pseudo-$C_\ell$ analysis — work in a non-orthogonal basis and a Gram deconvolution follows you everywhere *(gloss)*. This single fact shapes the whole solver story of §7.
+
+**Which subspaces? Follow the geometry.** The differential operators of §3 sit in the de Rham complex
+
+$$
+0 \to H^1 \xrightarrow{\ \nabla\ } H(\mathrm{curl}) \xrightarrow{\ \nabla\times\ } H(\mathrm{div}) \xrightarrow{\ \nabla\cdot\ } L^2 \to 0,
+$$
+
+and Stokes' theorem pairs $k$-forms with $k$-dimensional mesh objects. So represent each field by its natural integrals: point values at **vertices** (0-forms), circulations along **edges** (1-forms), fluxes through **faces** (2-forms), masses in **volumes** (3-forms). **Compatible (mimetic) finite elements** choose one polynomial space per slot — at order $p$: $Q_{p+1},\ N_p,\ RT_p,\ Q_p^D$, known in the code (and this wiki's [glossary](glossary.qmd)) as $\mathbb{W}_0\ldots\mathbb{W}_3$ — such that each operator maps one space *exactly into the next*[^feec]. Then $\nabla\times\nabla = 0$ and $\nabla\cdot\nabla\times = 0$ hold **exactly** in the discretisation (boundary-of-boundary, not approximation), spurious pressure/vorticity modes are excluded by construction[^infsup], and discrete integration by parts $\langle\sigma, \nabla\cdot\mathbf{v}\rangle = -\langle\nabla\sigma, \mathbf{v}\rangle + \text{b.c.}$ gives energy-consistent adjointness between gradient and divergence.
+
+**Placement of the state** (lowest order $p=0$ in practice; the paper's Fig. 2):
+
+| Field | Space (paper / code) | DoFs live on | Geometric type | Continuity between cells |
+|---|---|---|---|---|
+| velocity $\mathbf{u}$ | $RT_0$ / $\mathbb{W}_2$ | faces | flux (2-form) | normal component |
+| vorticity $\boldsymbol{\xi}$ | $N_0$ / $\mathbb{W}_1$ | edges | circulation (1-form) | tangential component |
+| $\rho$, $\Pi$ | $Q_0^D$ / $\mathbb{W}_3$ | cell volumes | density (3-form) | none (discontinuous) |
+| $\theta$ | $\mathbb{W}_\theta$ | top/bottom face centres | vertical part of $\mathbb{W}_2$, scalar | vertical only |
+
+Read the first and third rows together: velocity *is* face flux, density *is* cell mass, and the continuity equation $\partial_t\rho = -\nabla\cdot(\rho\mathbf{u})$ closes within $\mathbb{W}_2 \xrightarrow{\nabla\cdot} \mathbb{W}_3$ — so **local mass conservation is exact**, cell by cell, to machine precision. The placement is the conservation law.
+
+Two recognitions for a physicist: at lowest order this *is* the Arakawa C-grid (normal winds on faces, pressure at centres) — the FEM rebuilds the classic staggering without needing orthogonality; and it is the Yee lattice of computational electromagnetism ($\mathbf{E}$ on edges, $\mathbf{B}$ on faces), which was mimetic discretisation thirty years before the name[^yee]. The odd one out, $\mathbb{W}_\theta$, mimics the Charney–Phillips *vertical* staggering ($\theta$ co-located with vertical velocity), which excludes a vertical computational mode that the alternative (Lorenz) placement admits[^cp].
+
+One more property to flag now, because the entire parallelisation story hangs on it: **continuous spaces share DoFs between neighbouring cells** (a face flux belongs to both adjacent columns); discontinuous spaces do not. Shared DoFs ⇒ write conflicts between threads, ownership ambiguity between ranks, and the `GH_INC` access descriptor — all of §8 and §9.
+
+[^feec]: Names: Raviart–Thomas (1977) for $H(\mathrm{div})$, Nédélec (1980) for $H(\mathrm{curl})$; the unifying theory is Finite Element Exterior Calculus (Arnold, Falk & Winther 2006). Cotter & Shipton (2012) and Natale et al. (2016) — the paper's citations — imported it into NWP precisely to keep C-grid-like balance properties on non-orthogonal meshes. "Compatible", "mimetic", and "structure-preserving" are near-synonyms across communities.
+
+[^infsup]: The mixed (multi-space) formulation makes the discrete system a saddle-point problem, and arbitrary space pairs admit spurious modes — pressure patterns invisible to the discrete gradient, the FEM cousin of the checkerboard mode on collocated grids; think of them as exact degeneracies in the Fisher matrix of the weak-form "estimating equations": directions the data (test functions) cannot see *(gloss)*. The compatible families satisfy the inf-sup (LBB) stability condition that excludes them.
+
+[^yee]: Yee (1966), the FDTD lattice: electric field components on edges, magnetic through faces, and both discrete Maxwell divergence constraints then hold exactly — same exact-sequence mechanism, $\mathbb{W}_1$/$\mathbb{W}_2$ in modern dress.
+
+[^cp]: Lorenz placement puts $\theta$ at cell centres with $\rho$; discrete hydrostatic balance then cannot see a $2\Delta z$ zigzag in $\theta$ — a null direction of the discrete operator, which noise duly populates (the "computational mode"). Charney–Phillips stations $\theta$ on the cell's horizontal faces, where vertical motion lives, removing the null space. $\mathbb{W}_\theta$ is "horizontally discontinuous, vertically continuous": the scalar shadow of $\mathbb{W}_2$'s vertical components.
+
+---
+
+## 5. DoFs, columns, and memory: the data model
+
+A field is its coefficient vector; the **function space** object owns the indexing machinery (which DoFs exist, on which entities, shared how) and the **field** object owns the data — metadata and data split cleanly, which is what lets the PSy layer of §9 unpack one without understanding the other.
+
+The mesh product structure of §2 becomes an addressing scheme. A DoF is located by `map(df, col) + k`: `col` indexes the column (horizontally *unstructured* — a lookup through `map`, i.e. indirect addressing), `k` indexes the layer (vertically *structured* — direct addressing, unit stride), `df` selects which of the cell's DoFs. Memory layout puts $k$ innermost, so the irregular lookup is paid once per column and amortised over $\mathcal{O}(100)$ contiguous vertical points. One indirection buys mesh generality; the structured direction pays for it. *(In array terms: a ragged horizontal axis × a dense vertical axis, stored vertical-fastest.)*
+
+Distribution follows the same grain: the **partitioner** decomposes the *2D horizontal* mesh; columns are never split across ranks. Consequences: all vertical operations — the tridiagonal solves coming in §7, the physics columns of the future — are rank-local by construction; and partition boundaries run along cell faces, so the *shared* DoFs of §4 (on faces/edges/vertices of the cut) need an ownership convention (LFRic's docs call the locally-stored-but-foreign-owned ones *annexed* DoFs). Mesh pipeline: global 2D mesh (read from UGRID NetCDF) → partition → local extrusion to 3D.
+
+---
+
+## 6. Time: outrunning the sound waves
+
+After spatial discretisation we have a stiff ODE system $\dot{\mathbf{x}} = N(\mathbf{x})$. The Jacobian's spectrum spans acoustic/gravity-wave frequencies ($c_s \approx 340$ m/s) down to advective ones ($U \sim 10$–$50$ m/s): a stiffness ratio of order 10–30. An explicit scheme pays CFL on the *fastest* wave: at 5 km resolution, $\Delta t \lesssim \Delta x/c_s \approx 15$ s — yet the paper's runs take $\Delta t = 75$ s *(gloss arithmetic; $c_s$ is not in the paper)*. The classic NWP trick buys that factor: treat the fast, *linear* wave dynamics implicitly (A-stable, no CFL), and the slow, *nonlinear* advection accurately.
+
+The scheme is a two-time-level iterated semi-implicit method[^picard]. Each step solves the implicit equations by $K = 4$ Picard passes; each pass linearises with a frozen, **quasi-Newton** Jacobian $\mathcal{L}(\mathbf{x}^n)$ — assembled once per step from the previous state, containing exactly the acoustic and gravity-wave terms (the stiff part) — and solves
+
+$$
+\mathcal{L}(\mathbf{x}^n)\,\mathbf{x}' = \mathcal{R}(\mathbf{x}^{(k)}), \qquad \mathbf{x}' = \mathbf{x}^{(k+1)} - \mathbf{x}^{(k)},
+$$
+
+for the increment (the paper's Table 1 is this loop written out). Implicitness does not abolish the sound speed; it *relocates* it: information that physically travels $c_s\Delta t$ per step must now propagate through a global linear solve. The hyperbolic CFL constraint becomes an elliptic solver problem — the subject of §7, and the place where the timestep's cost actually lives.
+
+**Advection** is the other half of the step, and the place GungHo diverges most from its parent. ENDGame is semi-Lagrangian: integrate trajectories backwards, interpolate the field at the departure point — unconditionally stable, but the departure point is wherever the wind went, so the data dependence is *non-local and flow-dependent*: near the lat-lon poles, trajectories cross many ranks' domains (§2). GungHo instead uses an Eulerian finite-volume method-of-lines scheme: fit a high-order upwind polynomial over a **fixed local stencil** of neighbouring cells, evaluate the advective terms, and wrap the update in ~3 explicit substages for stability. Costs more arithmetic per step; in exchange, mass is conserved locally by construction and — decisive for everything downstream — *the communication pattern is static and bounded at compile time*. A code generator can reason about a fixed stencil; it cannot reason about where the wind blew[^cosmic].
+
+[^picard]: "Two-time-level": only $\mathbf{x}^n$ and $\mathbf{x}^{n+1}$ appear (no leapfrog ancestry, no time filters). "Picard" = fixed-point iteration on the nonlinear implicit equations (the name from Picard–Lindelöf existence theory); "quasi-Newton" = the Jacobian is approximated and frozen rather than recomputed — the same economy as freezing the curvature estimate in an optimiser while iterating the residual.
+
+[^cosmic]: Flagged future work: COSMIC, a *flux-form* semi-Lagrangian scheme — long-step advection recovered, but dimensionally split into 1D interpolations, communication tamed by mesh quasi-uniformity. (Long since this paper: the advection scheme has continued to evolve; the FV method-of-lines is the 2018 snapshot.)
+
+---
+
+## 7. The linear solve: marginalise, whiten, respect the correlation length
+
+Each Picard pass needs $\mathcal{L}\mathbf{x}' = \mathcal{R}$ solved over *all* prognostic DoFs — at C1944, $\mathcal{O}(10^9)$ unknowns, ill-conditioned, four times per step. Everything is **matrix-free**: LFRic's solver framework defines abstract `vector`, `linear operator`, `preconditioner`, and `iterative solver` types (PETSc's architecture, rebuilt in Fortran 2003 because no Fortran-callable equivalent fit), where operators only implement $x \mapsto Ax$ via mesh kernels. This is your map-maker: nobody assembles $P^TN^{-1}P$; Krylov methods[^krylov] consume matvecs, and one generic GMRES/CG/BiCGStab implementation serves every operator through the abstract interface — solver composition as plug-and-play, the same pattern as composing estimators.
+
+Two structural facts organise the solve:
+
+**(a) The Gram matrices are non-diagonal** (§4), so even mass-matrix inversion is a (short) Krylov iteration, and — unlike ENDGame on its orthogonal grid — the full coupled system cannot be reduced exactly to a scalar equation. An outer Krylov iteration over the mixed system $(\mathbf{u}', \theta', \rho', \Pi')$ is unavoidable; the 2018 code uses GCR for it.
+
+**(b) The preconditioner is a marginalisation.** Write the linearised system in blocks and eliminate everything except pressure. For $\begin{pmatrix} A & B\\ C & D\end{pmatrix}\begin{pmatrix}\mathbf{y}\\ \Pi'\end{pmatrix} = \begin{pmatrix}\mathbf{f}\\ g\end{pmatrix}$, elimination gives the **Schur complement** system $(D - CA^{-1}B)\,\Pi' = g - CA^{-1}\mathbf{f}$. You know this operation as Gaussian marginalisation — the Schur complement is the marginal precision of $\Pi'$ — and you have run it many times: destriping eliminates the map to get the small system for offsets; here we eliminate $(\mathbf{u}', \theta', \rho')$ to get a scalar elliptic equation for the Exner-pressure increment *(gloss; the paper says "approximate Schur complement")*. "Approximate" because $A$ contains a velocity mass matrix whose exact inverse is dense; it is **lumped** — replaced by its row-sum diagonal — to keep the complement sparse[^lump]. The result preconditions the outer iteration rather than replacing it.
+
+The pressure equation is a **Helmholtz problem** — in atmospheric usage, $(1 - \ell^2\nabla^2)$-shaped: screened Poisson, SPD, Yukawa Green's function $e^{-r/\ell}/r$. The screening length is $\ell \sim c_s\Delta t$ — the distance sound travels per implicit step, i.e. the range of the "instantaneous" action the implicit scheme replaced the waves with: $340 \text{ m/s} \times 75\text{ s} \approx 25$ km, a few cells *(gloss; the paper says only that the zero-order term limits the levels needed)*.
+
+That finite correlation length is what makes the chosen preconditioner work at scale, on two axes:
+
+- **Vertically**: the domain is a thin shell, $\Delta z \ll \Delta x$, so the operator is violently anisotropic and the strong coupling is vertical. Point smoothers stall on anisotropy; the cure is **line relaxation** — solve each column's vertical tridiagonal system *exactly* (Thomas algorithm, $\mathcal{O}(n)$, entirely on-rank because columns are never split — §5's decision paying off). The 2018 release uses exactly this as the whole preconditioner.
+- **Horizontally**: the destination (in development in the paper, production today) is **tensor-product multigrid**: line-relax vertically, coarsen only horizontally. Multigrid usually needs $\log(L/\Delta x)$ levels and a global coarse solve — a scalability liability. But coarsening only has to proceed until the grid spacing reaches $\ell$, beyond which the screened operator is locally invertible and the smoother alone finishes: 3–4 levels suffice, *independent of resolution* (as $\Delta x$ shrinks, advective CFL shrinks $\Delta t$ and hence $\ell$ proportionally, so $\ell/\Delta x$ is pinned — *gloss*). No global coarse grid, no scalability cliff.
+
+Preconditioning itself you can read as whitening: replace $A\mathbf{x}=\mathbf{b}$ by $P^{-1}A\mathbf{x} = P^{-1}\mathbf{b}$ with $P \approx A$ cheap to invert, so the spectrum bunches near 1 and Krylov convergence (rate governed by $\sqrt{\kappa}$) accelerates — block-Jacobi preconditioning in map-making is inverse-variance weighting, and the vertical-tridiagonal preconditioner is the same move: invert exactly the part of the operator you can afford, here the stiff vertical physics[^hybrid].
+
+[^krylov]: $\mathcal{K}_m(A, \mathbf{r}_0) = \mathrm{span}\{\mathbf{r}_0, A\mathbf{r}_0, \ldots, A^{m-1}\mathbf{r}_0\}$; iterates minimise error/residual over this growing subspace. CG: SPD systems, minimises the $A$-norm of error. GMRES: general matrices, minimises residual, stores the basis. BiCGStab: general, short recurrences — but ~5 inner products per iteration, each an `MPI_Allreduce`; remember that for §10. GCR: a flexible GMRES relative that tolerates a preconditioner that is itself an iterative solve — needed here because the "preconditioner" contains a Helmholtz *solver*.
+
+[^lump]: $M \to \mathrm{diag}(\sum_j M_{ij})$: exact on constants, spectrally close on smooth fields — the FEM equivalent of approximating a covariance by its diagonal after smoothing. Lumping is also what reduces lowest-order FEM toward classic finite differences.
+
+[^hybrid]: The paper also flags **hybridisation** (Gibson et al.): enlarge the system with Lagrange multipliers on faces so that the *exact* Schur complement becomes computable by static condensation — exact marginalisation by clever parametrisation rather than approximate marginalisation by lumping. Active research then; productive line since.
+
+---
+
+## 8. Parallelism: halos as Markov blankets
+
+**Distributed memory.** Partition the horizontal mesh; each rank owns a patch of columns. Every kernel in §6–7 has a *fixed, finite* stencil radius $w$, so updating owned DoFs needs foreign data only within distance $w$: a depth-$w$ **halo** of read-only copies. The statistical reading is exact: the stencil defines a Markov graph on columns, and the halo is the Markov blanket of the partition — conditioned on it, the local update is independent of the rest of the globe; a **halo exchange** is blanket synchronisation *(gloss)*. The exchange pattern is static (fixed stencil + fixed partition), so the communication routing tables are built once at initialisation — from each rank's lists of owned and haloed global DoF ids — and replayed every step (by YAXT, a lightweight library that replaced the much heavier ESMF with no speed loss; the swap was painless precisely because communication is confined to one layer — modularity's receipts)[^yaxt].
+
+Exchanges are **lazy**: the infrastructure keeps a dirty/clean validity bit per field per halo depth; generated code exchanges only if a kernel will actually read stale halo. This is write-invalidate cache coherence, implemented at the model level *(gloss)*.
+
+**Redundant computation.** Contributions to DoFs shared across a partition cut can either be communicated (partial sums from each side) or *recomputed by both sides* into a deeper halo. LFRic chooses recomputation: trade flops for messages — the same trade as `jax.checkpoint`/rematerialisation, spending compute to avoid a more expensive resource *(gloss)*. The economics scale with the surface-to-volume ratio of the partition, which is why **hybrid MPI+OpenMP wins** in Fig. 8: 6 ranks × 6 threads per node has ~6× fewer, larger partitions per node than 36 pure-MPI ranks, hence proportionally less perimeter to redundantly compute.
+
+**Shared memory.** Within a rank, OpenMP threads loop over cells — but for *continuous* spaces (§4's flag), neighbouring cells increment shared DoFs: a race. The fix is **graph colouring**: partition cells into independent sets of the shares-a-DoF graph; threads sweep one colour at a time, conflict-free. This is red-black Gauss–Seidel generalised to unstructured meshes — or, in your language, the chromatic scheduling of parallel Gibbs sampling on an MRF: same graph, same colouring, same guarantee *(gloss)*. Colouring is computed once per mesh by the infrastructure; whether a kernel needs it is *decidable from its metadata* (`GH_INC` on a continuous space) — which is the bridge to §9.
+
+**The remaining primitive** is the global reduction: Krylov dot products are `MPI_Allreduce` — a $\log P$-depth synchronisation of *every* rank. Five per BiCGStab iteration, several solves per step. At modest scale, invisible; at 157k cores, §10's wall.
+
+[^yaxt]: YAXT (DKRZ), "Yet Another eXchange Tool". The precomputed routing table is the communication analogue of precomputing a pointing matrix's sparsity: pay the graph construction once, replay cheap. ESMF's tables were equally fast — the objection was carrying a framework to use one feature.
+
+---
+
+## 9. PSyKAl and PSyclone: making the structure machine-readable
+
+Now the second half of the thesis. The portability problem, in economic terms: science code lives for decades; machines turn over in ~5 years; and the parallel programming model is not one choice but a *stack* of heterogeneous ones (MPI, OpenMP, OpenACC, CUDA, PGAS…) whose composition is outside any standard, and whose optimal selection — including data layout and loop order — varies per machine. Hand-weaving any particular X into a million lines of science Fortran is a rewrite per architecture. A general-purpose compiler cannot rescue you: legal Fortran hides too much (aliasing, side effects), forcing conservatism. **The DSL bet: restrict the domain until the structure is decidable, then generate.**
+
+LFRic's architecture, **PSyKAl**, is three layers with hard API walls:
+
+- **Algorithm** (scientist-written): operations on *global* field objects; kernels requested via `call invoke(...)`. Looks like Fortran; is parsed, not compiled — `invoke` is not a real procedure but an instruction to the generator.
+- **Kernel** (scientist-written): plain Fortran subroutine over *one column*, receiving bare arrays and loop bounds. No MPI, no threads, no objects: pure local arithmetic — referentially transparent by construction, which is what makes everything else legal.
+- **PSy** (generated): the middle layer that dereferences field objects (via proxies), loops over the horizontal mesh, and weaves in *all* parallelism — halo exchanges, colouring, directives, global sums.
+
+The load-bearing element is **kernel metadata** — a declared effect system. Each kernel states, per argument: kind (`GH_FIELD` / `GH_OPERATOR` / scalar), access (`GH_READ`, `GH_WRITE`, `GH_READWRITE`, `GH_INC`), and function space; plus its iteration space (`iterates_over = CELLS`):
+
+```fortran
+type(arg_type) :: meta_args(3) = (/                            &
+     arg_type(GH_FIELD,    GH_INC,  ANY_SPACE_1),              &  ! v: incremented; continuous ⇒ shared DoFs
+     arg_type(GH_FIELD,    GH_READ, ANY_SPACE_2),              &  ! s: read ⇒ halo must be clean
+     arg_type(GH_OPERATOR, GH_READ, ANY_SPACE_1, ANY_SPACE_2) /)  ! mm: map from space 2 to space 1
+integer :: iterates_over = CELLS
+```
+
+From access + space-continuity, **PSyclone** (a Python compiler: fparser → AST → per-invoke *schedule* IR → transformations → Fortran) *derives* the parallel code: a `GH_READ` whose halo is dirty ⇒ insert `halo_exchange(depth=…)`; `GH_INC` on a continuous space ⇒ shared-DoF writes ⇒ colour the loop; reductions ⇒ global sums; dependence analysis keeps all of it minimal. The generated PSy code for the paper's example is mundane and that is the point — an `IF dirty THEN exchange`, a cell loop, a kernel call — *correct by derivation rather than by review*.
+
+Optimisation is deliberately **human-in-the-loop**: an HPC expert writes a small Python *transformation script* against the schedule — the paper's Appendix applies colouring + OpenMP to the whole model in 17 lines — rather than trusting full automation. Science source: untouched.
+
+The dictionary you already own *(gloss)*:
+
+| PSyKAl / PSyclone | JAX / XLA |
+|---|---|
+| `invoke` boundary | `jit` boundary |
+| algorithm layer (parsed, not compiled) | traced Python |
+| kernel + metadata | primitive + abstract-eval rule (shapes, effects) |
+| schedule (per-invoke IR) | jaxpr / HLO |
+| transformation script | compiler-pass pipeline |
+| built-ins (`setval_c`, …) | `lax` primitives |
+| metadata-derived halo exchanges | sharding-annotation-derived collectives (`shard_map`/GSPMD) |
+| colouring transformation | conflict-free scatter scheduling |
+| redundant computation | rematerialisation (`jax.checkpoint`) |
+| one source → MPI/OpenMP/OpenACC | one jaxpr → CPU/GPU/TPU |
+
+The differences are as instructive as the matches: kernels stay *hand-written* (domain scientists keep ownership, and ordinary debuggers/profilers work on the generated Fortran), and optimisation stays *hand-directed* per machine. Contrast Firedrake (also cited): there you write the weak form itself in UFL and even the kernels are generated — a stronger DSL demanding more trust in automation. PSyclone sits deliberately lower on that autonomy dial; given a 30-year institutional code base and physicists who must own their kernels, the dial position is sociology as much as compiler theory *(gloss)*[^op2].
+
+Infrastructure footnotes to the main story: the API walls are enforced with Fortran 2003 abstract types — and, ironically, patchy compiler support for those very OO features was a real porting bottleneck for the portability framework[^fortran]. I/O goes through XIOS — client/server with dedicated asynchronous I/O ranks, XML-declared output workflows, in-situ reduction (regridding, time averages) before anything touches disk, UGRID NetCDF for unstructured topology — behind a thin interface so a field can simply `call field%write_field()`[^xios].
+
+[^op2]: Lineage and neighbours, for orientation: PSyclone generalises OP2/PyOP2 (unstructured-mesh parallel-loop frameworks; PSyclone adds multi-kernel invokes and takes over distributed memory). GridTools/STELLA (MeteoSwiss) and Firedrake/FEniCS are the generate-the-kernels-too school; Kokkos/OCCA are orthogonal single-node portability layers a DSL could target; CLAW is directive-driven Fortran translation for physics columns. The paper's related-work section is a fair map of the 2018 landscape.
+
+[^fortran]: Why Fortran at all: the kernels must be writable by atmospheric scientists, the institution's language is Fortran, and generated Fortran is debuggable/profilable with standard tools. The embedded-DSL choice (metadata as Fortran derived types, no new syntax) means the science source is always also legal Fortran.
+
+[^xios]: XIOS (IPSL, also used by NEMO — hence Met Office experience): I/O servers absorb output asynchronously so compute ranks never block on disk; shown scalable to 13,824 cores in the companion study (Adams et al. 2018). The UGRID write path was added to XIOS by IPSL in collaboration with this project — the mesh of §2 reaching all the way into the file format.
+
+---
+
+## 10. The scaling results, read like an experimentalist
+
+Strong scaling, parallel efficiency $E(N) = T_{216}\,/\,(T_N \cdot N/216)$ relative to 216 nodes. Setup: C1944 (≈5 km) × 30 levels, baroclinic-wave test[^baroclinic], $\Delta t = 75$ s, Cray XC40 (dual 18-core Broadwell), hybrid 6 ranks × 6 threads per node, Intel 17 `-O3`. Headline: **~70% efficiency at 4374 nodes ≈ 157k cores** — for a model whose solver is explicitly *not yet algorithmically optimal* (2018's tridiagonal-preconditioned BiCGStab, not multigrid).
+
+The failure-mode autopsy is more informative than the number, and the paper does it honestly:
+
+- **Local volume exhaustion**: at 157k-way parallelism each unit of parallelism holds a 12×12×30 patch = **4320 pressure DoFs**. Surface-to-volume: the halo fraction, and with it redundant computation and exchange cost, balloons as patches shrink. This is the generic strong-scaling endgame, arriving exactly on schedule.
+- **Global sums**: ~5 `Allreduce` per BiCGStab iteration × a large iteration count (weak preconditioner) × multiple solves per step — a $\log P$ synchronisation wall. Note the shape of the fix: *multigrid is a communication optimisation* — a better preconditioner cuts the iteration count, hence the number of global synchronisations, attacking the network through the linear algebra *(gloss)*.
+
+The second experiment (C576, 36 MPI ranks/node vs 6×6 hybrid) shows hybrid faster and scaling better — §8's redundant-computation economics observed in the wild.
+
+What is deliberately *not* claimed: no physics parametrizations are timed, I/O is off, and no wall-clock comparison against the UM is offered — the UM is a decades-tuned incumbent on its home architecture; LFRic's claim is the *slope* (scaling behaviour, algorithmic headroom), not the 2018 *intercept*. The paper says the quiet part aloud: until the solver is algorithmically optimal, computational micro-optimisation is premature.
+
+And the result that actually proves the thesis sits quietly in the conclusions: after months of development *in serial*, the model ran on **220,000 cores within two weeks** of PSyclone's distributed-memory support landing — with **zero changes to the science code**. That is the separation of concerns demonstrated, not argued.
+
+[^baroclinic]: Ullrich et al. (2014): an analytically-specified unstable mid-latitude jet whose perturbation rolls up into cyclones — the community's standard dry-dynamics benchmark; the closest CMB analogue is a standardised simulation suite used for pipeline validation rather than science.
+
+---
+
+## 11. The paper from 2026
+
+*(Orientation, not paper content — sourced from the submodules in this wiki and public Met Office material.)*
+
+- **The numerics matured as planned.** The GungHo formulation papers came out (Melvin et al. 2019, Cartesian; Melvin et al. 2024, spherical), and the tensor-product multigrid of §7 is the production preconditioner (Maynard, Melvin & Müller 2020) — today's training configurations run `l_multigrid=.true.` as a matter of course.
+- **The code split in two**: [`lfric_core`](lfric-core.qmd) (infrastructure: mesh, fields, halo machinery, XIOS) and [`lfric_apps`](lfric-apps.qmd) (science: GungHo, physics, the full atmosphere model), both public on GitHub since the Met Office's 2024 move from internal SVN/Trac.
+- **Names shifted**: the LFRic-based atmosphere model is delivered under the **Momentum®** partnership branding (the model this wiki orbits). "LFRic" increasingly means the infrastructure.
+- **PSyclone outgrew LFRic**: on PyPI, with the OpenACC/OpenMP-offload GPU path the paper promised, adopted beyond the Met Office (notably transforming NEMO ocean code), and sprouting PSyAD for adjoint generation (§1's assimilation story).
+- **Phase 3 moved right**, in the time-honoured way: the UM is still operational in 2026, with LFRic-Atmosphere in trial configurations. The 2018 paper's "mid-2020s" replacement is now late-decade.
+
+For going deeper, in this wiki: [LFRic core docs](lfric-core.qmd), [training materials](training.qmd) (hands-on with exactly the kernels/invokes of §9), and the [glossary](glossary.qmd).
+
+---
+
+## Summary
+
+| Concept | Formal content | Your nearest neighbour |
+|---|---|---|
+| Sphere sampling | equi-angular cubed sphere C$n$, $6n^2$ columns; defect $\sum(4{-}\deg) = 8$ at 8 corners | COBE quad-cube; HEALPix trade-offs, different objective |
+| State | $\mathbf{x} = (\mathbf{u},\theta,\rho,\Pi)$, Euler eqns, PGF $= c_p\theta\nabla\Pi$ exactly | $\theta$ = entropy label; vector-invariant form |
+| Discretisation | compatible FEM on discrete de Rham complex $\mathbb{W}_0 \to \mathbb{W}_1 \to \mathbb{W}_2 \to \mathbb{W}_3$ | Yee lattice; C-grid; Galerkin = estimating equations |
+| Conservation | $\nabla\cdot: \mathbb{W}_2 \to \mathbb{W}_3$ exact ⇒ cell-wise mass conservation to machine precision | exactness of $d\circ d = 0$, not accuracy order |
+| Mass matrix | Gram matrix of non-orthogonal basis; never diagonal | pseudo-$C_\ell$ coupling matrix |
+| Data model | DoF = `map(df,col) + k`; unstructured × structured, $k$ innermost; columns never split | ragged × dense array, dense axis fastest |
+| Timestep | 2-level semi-implicit; $K{=}4$ Picard; quasi-Newton $\mathcal{L}(\mathbf{x}^n)\mathbf{x}' = \mathcal{R}$ | stiff splitting; frozen-curvature iteration |
+| Pressure solve | approx. Schur complement → screened Poisson, range $\ell \sim c_s\Delta t$ | destriping (eliminate nuisance block); Yukawa propagator |
+| Preconditioner | vertical line relaxation + horizontal multigrid; 3–4 levels, resolution-independent | whitening; inverse-variance weighting; finite correlation length |
+| Distributed memory | depth-$w$ halos from stencil radius $w$; lazy dirty/clean exchanges; precomputed routing | Markov blanket synchronisation |
+| Shared memory | cell colouring on the shares-a-DoF graph | chromatic parallel Gibbs; red-black Gauss–Seidel |
+| Comms tuning | redundant computation into halos; hybrid MPI+OpenMP via surface/volume | rematerialisation (`jax.checkpoint`) |
+| DSL | PSyKAl layers; kernel metadata = effect system; PSyclone schedule + transformations | `jit` / jaxpr / compiler passes / sharding-derived collectives |
+| Scaling | ~70% @ 157k cores; limits: 4320 DoFs/core local volume + Krylov `Allreduce`s | strong-scaling endgame; latency wall |
+
+**Reading map** — note § → paper §: 1 → 1; 2 → 2 (mesh paragraphs); 3 → 2.1; 4 → 2.2; 5 → 2 (end), 4; 6 → 2.3–2.4; 7 → 6; 8 → 4.1–4.2; 9 → 3, 5; 10 → 7; 11 → (post-dates the paper).

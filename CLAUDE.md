@@ -52,6 +52,10 @@ quarto render src
 - **XIOS** is used for parallel I/O; pinned to IPSL GitLab mirror revision 2252 (old SVN endpoint retired)
 - Rose/Cylc suites use `rose stem` for CI and `cylc vip` for submission; requires SSH agent for the scheduler host
 
+## Explainer Notes (house tone)
+
+`src/paper-explained.qmd` is the model for personalized explainer documents; the full style spec lives in the `explain` skill (`.claude/skills/explain/SKILL.md`). Short version: ground-up rebuild in logical order (not source order); math formalism first; bridges into the reader's fields (CMB data analysis, statistics, JAX); footnotes (not blockquotes) for asides and etymology; mark interpretive claims *(gloss)* vs. source claims; summary table at the end; British spelling. Style ancestors: `~/git/private/project-ai/notes/` (`tokenization_notes.md`, `adamw_notes.md`).
+
 ## External Links
 
 - LFRic Core docs: https://metoffice.github.io/lfric_core/

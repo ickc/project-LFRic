@@ -24,6 +24,8 @@ website:
             text: Isambard3
           - href: paper.qmd
             text: Paper
+          - href: paper-explained.qmd
+            text: "Paper, Explained"
       - href: glossary.qmd
         text: Glossary
 
