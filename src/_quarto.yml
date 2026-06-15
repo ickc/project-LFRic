@@ -26,6 +26,8 @@ website:
             text: Paper
           - href: paper-explained.qmd
             text: "Paper, Explained"
+          - href: formulation-explained.qmd
+            text: "Formulation, from First Principles"
       - href: glossary.qmd
         text: Glossary
 

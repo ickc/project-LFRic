@@ -72,7 +72,7 @@ $$
 \Pi^{\frac{1-\kappa}{\kappa}} = \frac{R}{p_0}\,\rho\,\theta .
 $$
 
-The state is $\mathbf{x} = (\mathbf{u}, \theta, \rho, \Pi)$: wind, potential temperature, density, Exner pressure, with $\kappa = R/c_p \approx 2/7$. Three reading notes:
+The state is $\mathbf{x} = (\mathbf{u}, \theta, \rho, \Pi)$: wind, potential temperature, density, Exner pressure, with $\kappa = R/c_p \approx 2/7$. This section reads the equations at systems level; for a ground-up derivation of all four from Newton's second law, the first law of thermodynamics, and a rotating frame — including what $\theta$ and $\Pi$ actually *are* — see the companion note [Formulation, from First Principles](formulation-explained.qmd). Three reading notes:
 
 - The momentum equation is in **vector-invariant form**[^vecinv]: the advection term is rewritten so that the rotation enters only through the *total* vorticity $2\boldsymbol{\Omega} + \nabla\times\mathbf{u}$ — Coriolis is not a separate force, just the planetary share of the vorticity. This is also why vorticity gets its own function space in §4.
 - The thermodynamic pair $(\theta, \Pi)$ replaces $(T, p)$. $\theta = T(p_0/p)^{\kappa}$ is the temperature after adiabatic compression to reference pressure — an entropy label ($s = c_p\ln\theta + \text{const}$), hence *materially conserved*: its equation is pure advection. And the pressure-gradient force becomes exactly $\rho^{-1}\nabla p = c_p\theta\nabla\Pi$[^pgf] — bilinear in the state, which is precisely what the linearisation in §6 wants.

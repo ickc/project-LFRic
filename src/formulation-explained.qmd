@@ -1,0 +1,314 @@
+---
+title: "The GungHo Equations, from First Principles"
+subtitle: "A personal note for the mathematically conversant but possibly rusty"
+---
+
+A ground-up companion to §2.1 *Formulation* of [Adams et al. (2019)](https://arxiv.org/abs/1809.07267) (source in [`submodules/arXiv-1809.07267/`](paper.qmd)). The wider companion [Paper, Explained](paper-explained.qmd) *states* these equations (its §3) and reads them at the level of someone who already speaks fluid dynamics; this note instead **derives** them from scratch — Newton's second law, the first law of thermodynamics, a rotating frame — at the level of an undergraduate physics course, for a reader whose graduate fluids has gone rusty. Standard results are recalled, not assumed; the two genuinely unfamiliar objects (potential temperature $\theta$, Exner pressure $\Pi$) get a full account. Terms are in the [glossary](glossary.qmd); a reading map is at the end.
+
+**The essence.** The four equations look formidable but are nothing exotic. They are the three great conservation laws — **mass, momentum, energy** — for a compressible ideal gas, written at a fixed point in a frame rotating with the Earth, and then dressed in two thermodynamic variables $(\theta, \Pi)$ chosen so that the pressure-gradient force and the equation of state both come out clean. Strip the costume and underneath is first-year physics. Here is the map, which is also this note's outline:
+
+| Paper equation | The physics underneath | Built in |
+|---|---|---|
+| $\partial_t\rho = -\nabla\cdot(\rho\mathbf{u})$ | conservation of **mass** | §2 |
+| $\partial_t\mathbf{u} = -(2\boldsymbol{\Omega}+\nabla\times\mathbf{u})\times\mathbf{u} - \nabla(\tfrac12\mathbf{u}\cdot\mathbf{u}+\Phi) - c_p\theta\nabla\Pi$ | Newton's 2nd law (inviscid) in a **rotating frame**, rearranged | §3–§5, §7 |
+| $\partial_t\theta = -\mathbf{u}\cdot\nabla\theta$ | first law of **thermodynamics**, adiabatic = entropy conservation | §6 |
+| $\Pi^{(1-\kappa)/\kappa} = \tfrac{R}{p_0}\rho\theta$ | the **ideal gas law**, in disguise | §7 |
+
+Your own instinct in posing this was exactly right: *compressible-fluid PDEs + thermodynamics + non-inertial frame*. We build those three pillars separately and glue them in §8 — where it turns out only two joints are non-trivial, and both are thermodynamic.
+
+---
+
+## 1. Reading the equations: fields, parcels, and the material derivative
+
+The unknowns are **fields** over a thin spherical shell: the wind $\mathbf{u}(\mathbf{x},t)$, density $\rho(\mathbf{x},t)$, potential temperature $\theta(\mathbf{x},t)$, Exner pressure $\Pi(\mathbf{x},t)$ — each a function of position and time. This is the **Eulerian** description: stand at a fixed point $\mathbf{x}$ and watch the fluid stream past. Its opposite is the **Lagrangian** description: pick a material parcel and ride along with it. The whole of §2.1 is written Eulerian (the time derivative on every left-hand side is $\partial_t$ at fixed $\mathbf{x}$), but the *physics* — Newton, the first law — is naturally stated for a parcel, so the two viewpoints must be reconciled before anything else.
+
+The bridge is the **material derivative** (also: total, substantial, convective derivative). The rate of change of a quantity $q$ *seen by an observer riding the flow* is, by the chain rule on $q(\mathbf{x}(t),t)$ with $\dot{\mathbf{x}}=\mathbf{u}$,
+
+$$
+\frac{Dq}{Dt} \;\equiv\; \frac{\partial q}{\partial t} + \mathbf{u}\cdot\nabla q .
+$$
+
+The first term is the local change at a fixed point; the second, $\mathbf{u}\cdot\nabla q$, is **advection**[^advect] — the change you feel purely because the flow has carried you to a place where $q$ was different. Every conservation law below is most naturally a statement about $D/Dt$ (about parcels); the paper just moves the advection term to the right and keeps $\partial_t$ on the left.
+
+A bookkeeping check that the system is **closed**: the unknowns are $\mathbf{u}$ (three components), $\rho$, $\theta$, $\Pi$ — six scalar fields. The equations are momentum (three), the $\theta$ equation (one), continuity (one) — five evolution equations — plus the equation of state (one algebraic relation). Six equations, six unknowns. The equation of state carries no time derivative, so $\Pi$ is really *diagnosed* instantaneously from the others rather than marched in time; hold that thought for §8.
+
+[^advect]: From Latin *advehere*, "to carry to" — distinct from *convection* (Latin *convehere*, "to carry together"), which meteorology reserves for buoyancy-driven vertical transport. The advection operator $\mathbf{u}\cdot\nabla$ is the one nonlinearity that makes fluid dynamics hard: it is quadratic in the state (the wind advects itself), and it is the source of turbulence, of the energy cascade, and — for a code generator — of the awkward question "where did this parcel come from?" that §6 of the wider companion turns into a design decision.
+
+---
+
+## 2. Conservation of mass — the continuity equation
+
+The most fundamental law, and the one you correctly recognised as "conservation of matter." Take any fixed control volume $V$ in space. The mass it contains is $\int_V \rho\,dV$, and mass is neither created nor destroyed, so it can change only by flowing through the boundary $\partial V$:
+
+$$
+\frac{d}{dt}\int_V \rho\,dV \;=\; -\oint_{\partial V} \rho\mathbf{u}\cdot d\mathbf{A} .
+$$
+
+The integrand $\rho\mathbf{u}$ is the **mass flux density** (mass per unit area per unit time); the minus sign makes outflow decrease the contents. Apply the divergence theorem to the right-hand side and shrink $V$ to a point (the relation holds for *every* $V$, so the integrands must match):
+
+$$
+\boxed{\;\frac{\partial\rho}{\partial t} + \nabla\cdot(\rho\mathbf{u}) = 0\;}
+$$
+
+— the paper's third equation. This is the universal template of a **local conservation law**: $\partial_t(\text{density}) + \nabla\cdot(\text{current}) = 0$. You have met it as charge conservation $\partial_t\rho_q + \nabla\cdot\mathbf{J}=0$ in electromagnetism; it is the same statement that "stuff" is locally accounted for, never teleporting[^localcons].
+
+Rewriting with the material derivative exposes the compressibility content. Expand $\nabla\cdot(\rho\mathbf{u}) = \mathbf{u}\cdot\nabla\rho + \rho\,\nabla\cdot\mathbf{u}$ and collect:
+
+$$
+\frac{D\rho}{Dt} = -\rho\,\nabla\cdot\mathbf{u} .
+$$
+
+A parcel's density changes only where the flow has nonzero divergence — where streamlines converge it is compressed, where they diverge it is rarefied. Setting $\nabla\cdot\mathbf{u}=0$ recovers the familiar **incompressible** limit (constant-density parcels, the ocean-modeller's world). GungHo keeps the full compressible term on purpose, and pays dearly for it: compressibility is exactly what lets the gas carry **sound waves** (§8), the fast, stiff modes that the rest of LFRic's machinery exists to outrun[^incomp].
+
+[^localcons]: The contrast is a *global* conservation law, $\frac{d}{dt}\int_{\text{all space}}\rho\,dV=0$, which permits mass to vanish here and reappear there. The local (differential) form forbids that: change here must equal flux through the local boundary. For a numerical model this is the property worth protecting to machine precision, and the compatible finite-element discretisation of the wider companion's §4 does precisely that — it makes "velocity = face flux, density = cell mass" hold *by construction*, so this control-volume argument runs cell-by-cell on the actual mesh.
+
+[^incomp]: Sound speed $c_s=\sqrt{\gamma RT}\approx 340\,\mathrm{m\,s^{-1}}$ versus weather winds $\sim 10\text{–}50\,\mathrm{m\,s^{-1}}$: a stiffness ratio of order ten. The incompressible (and the intermediate "anelastic"/"Boussinesq") systems *filter* sound out analytically by constraining $\nabla\cdot(\cdot)=0$; a fully compressible core like GungHo keeps the acoustics and instead defeats them numerically with a semi-implicit timestep. The choice buys physical completeness (correct mass, correct fast-wave response for data assimilation) at the cost of the solver story in the companion's §6–7.
+
+---
+
+## 3. Newton's second law for a fluid — the Euler equation
+
+Momentum next, in an ordinary inertial frame first; the rotation comes in §4. Apply $\mathbf{F}=m\mathbf{a}$ to a fluid parcel, per unit volume (so $m\to\rho$ and $\mathbf{a}\to D\mathbf{u}/Dt$, the acceleration of the parcel we are riding):
+
+$$
+\rho\,\frac{D\mathbf{u}}{Dt} = \mathbf{f}_{\text{pressure}} + \mathbf{f}_{\text{gravity}} + \dots
+$$
+
+Two body forces matter for the dry core. **Pressure** acts on the parcel's surface; its net force per unit volume is $-\nabla p$[^pgforce] — fluid is pushed from high pressure toward low. **Gravity** is $\rho\mathbf{g}$, with $\mathbf{g}=-\nabla\Phi_{\!g}$ for a gravitational potential $\Phi_{\!g}$. What is *absent* is the viscous force $\mu\nabla^2\mathbf{u}$: dropping it is exactly what makes this the **Euler** equation rather than Navier–Stokes[^euler]. Dividing through by $\rho$,
+
+$$
+\frac{D\mathbf{u}}{Dt} = -\frac{1}{\rho}\nabla p - \nabla\Phi_{\!g} .
+$$
+
+This is the whole of momentum dynamics, in the inertial frame, with the pressure force still in its raw form $\rho^{-1}\nabla p$. Two transformations remain to reach the paper's equation: rotate into the Earth's frame (§4), and rearrange the advection so the rotation enters cleanly (§5). The pressure term we leave alone until the thermodynamics of §7 can rewrite it.
+
+[^pgforce]: The net pressure force on a parcel is $-\oint_{\partial V} p\,d\mathbf{A} = -\int_V \nabla p\,dV$ (the gradient theorem), so per unit volume it is $-\nabla p$. Only the *gradient* enters — a uniform pressure squeezes a parcel from all sides and produces no net force, which is why weather depends on pressure *differences*, not absolute pressure.
+
+[^euler]: Euler (1757), a century before Navier and Stokes added viscosity. Neglecting viscosity is justified for the **resolved** flow: the atmospheric Reynolds number is astronomical ($\sim 10^{12}$), so molecular viscosity is utterly negligible at the mesh scale. The real dissipation lives in unresolved turbulence and is handled separately by **physics parametrisations** — deliberately outside the dynamical core, and outside §2.1. The dynamical core is the *conservative, reversible* skeleton; the irreversible flesh is bolted on elsewhere.
+
+---
+
+## 4. The rotating frame — Coriolis, centrifugal, and the geopotential
+
+We forecast in the frame that turns with the Earth (rotation rate $\boldsymbol{\Omega}$, $|\boldsymbol{\Omega}|=7.29\times10^{-5}\,\mathrm{s^{-1}}$, one turn per sidereal day), so we need Newton's law there. The price of a non-inertial frame is fictitious forces. The kinematic key is that the rate of change of *any* vector differs between the inertial (I) and rotating (R) frames by the rotation:
+
+$$
+\left(\frac{d}{dt}\right)_{\!I} = \left(\frac{d}{dt}\right)_{\!R} + \boldsymbol{\Omega}\times .
+$$
+
+Apply this twice to the position vector (and use $\dot{\boldsymbol{\Omega}}=0$ for the Earth) to relate the accelerations[^rotderiv]:
+
+$$
+\mathbf{a}_I = \mathbf{a}_R + 2\boldsymbol{\Omega}\times\mathbf{u} + \boldsymbol{\Omega}\times(\boldsymbol{\Omega}\times\mathbf{r}) ,
+$$
+
+where $\mathbf{u}$ and $\mathbf{a}_R$ are now the velocity and acceleration measured in the rotating frame. Newton's law holds for $\mathbf{a}_I$; solving for the frame-relative acceleration $\mathbf{a}_R = D\mathbf{u}/Dt$ moves the two extra terms to the force side as **fictitious forces**:
+
+$$
+\frac{D\mathbf{u}}{Dt} = -\frac{1}{\rho}\nabla p - \nabla\Phi_{\!g}
+\;\underbrace{-\,2\boldsymbol{\Omega}\times\mathbf{u}}_{\text{Coriolis}}
+\;\underbrace{-\,\boldsymbol{\Omega}\times(\boldsymbol{\Omega}\times\mathbf{r})}_{\text{centrifugal}} .
+$$
+
+The **Coriolis** force $-2\boldsymbol{\Omega}\times\mathbf{u}$ is the one you spotted, and the $2\boldsymbol{\Omega}$ you flagged is its coefficient. Being perpendicular to $\mathbf{u}$, it deflects motion (rightward in the Northern hemisphere, leftward in the Southern) but does **no work** — it sets the *shape* of the flow, not its energy. It has the same mathematical form as the magnetic Lorentz force $q\,\mathbf{v}\times\mathbf{B}$, with $2\boldsymbol{\Omega}$ playing the role of $\mathbf{B}$; that analogy is exact and worth keeping[^coriolis].
+
+The **centrifugal** force needs no dedicated term in the final equation, and here is why. Using $\mathbf{a}\times(\mathbf{a}\times\mathbf{b}) = \mathbf{a}(\mathbf{a}\cdot\mathbf{b}) - \mathbf{b}\,|\mathbf{a}|^2$,
+
+$$
+-\boldsymbol{\Omega}\times(\boldsymbol{\Omega}\times\mathbf{r}) = \Omega^2\mathbf{r}_\perp = \nabla\!\left(\tfrac12\Omega^2 r_\perp^2\right),
+$$
+
+with $\mathbf{r}_\perp$ the component of $\mathbf{r}$ perpendicular to the rotation axis (the cylindrical radius). The centrifugal force is a pure gradient, so it can be **absorbed into the gravitational potential**. Define the **geopotential**
+
+$$
+\Phi \;\equiv\; \Phi_{\!g} - \tfrac12\Omega^2 r_\perp^2 ,
+$$
+
+so that $-\nabla\Phi_{\!g} - \boldsymbol{\Omega}\times(\boldsymbol{\Omega}\times\mathbf{r}) = -\nabla\Phi$. This $\Phi$ is the potential of **apparent gravity** $\mathbf{g}_{\text{eff}}=-\nabla\Phi$ — the "down" a plumb line shows and an altimeter measures; its level surfaces are the geoid (mean sea level), and the Earth's equatorial bulge is nothing but the centrifugal term reshaping an equipotential away from a sphere[^geoid]. Near the surface $\Phi\approx gz$ with $z$ the height and $g\approx 9.81\,\mathrm{m\,s^{-2}}$, which is the form the glossary quotes. The momentum equation is now
+
+$$
+\frac{D\mathbf{u}}{Dt} = -\frac{1}{\rho}\nabla p - \nabla\Phi - 2\boldsymbol{\Omega}\times\mathbf{u} .
+$$
+
+[^rotderiv]: Standard rigid-rotation kinematics (Goldstein, Marion–Thornton). Expanding once gives $\mathbf{u}_I=\mathbf{u}_R+\boldsymbol{\Omega}\times\mathbf{r}$; differentiating again with the same operator identity gives the three terms, the missing fourth ($\dot{\boldsymbol{\Omega}}\times\mathbf{r}$, the Euler force) vanishing because the Earth's spin is steady. The factor of $2$ on Coriolis is the cross-term from differentiating a product twice — one share from the rotation acting on $\mathbf{u}_R$, one from $\boldsymbol{\Omega}\times\mathbf{r}$ being itself a moving vector.
+
+[^coriolis]: The Coriolis–Lorentz analogy is more than a curiosity: geostrophic balance (pressure gradient $\approx$ Coriolis) is the meteorological twin of the $\mathbf{E}\times\mathbf{B}$ drift, and the Taylor–Proudman theorem (rapid rotation stiffens the flow into axis-aligned columns) is the fluid analogue of magnetic field lines. The locally-vertical component of $2\boldsymbol{\Omega}$ is the **Coriolis parameter** $f=2\Omega\sin\varphi$ at latitude $\varphi$, the single number that governs mid-latitude balanced dynamics. That Coriolis does no work is the same fact as the magnetic force doing no work — both are $\perp$ to velocity by the cross product.
+
+[^geoid]: This is why the equation carries a single $\Phi$ and *no* visible centrifugal term: the bulge has been folded into the definition of "level." Were you to use the true gravitational $\Phi_{\!g}$ instead, you would have to carry the centrifugal force explicitly and your "horizontal" surfaces would not be the ones water actually rests on. Folding it into $\Phi$ is both physically honest and algebraically tidy.
+
+---
+
+## 5. Vector-invariant form — Coriolis as planetary vorticity
+
+The paper does not leave the advection inside $D\mathbf{u}/Dt$; it rewrites it. Expand $\dfrac{D\mathbf{u}}{Dt}=\dfrac{\partial\mathbf{u}}{\partial t}+(\mathbf{u}\cdot\nabla)\mathbf{u}$ and use the vector-calculus identity
+
+$$
+(\mathbf{u}\cdot\nabla)\mathbf{u} = \nabla\!\left(\tfrac12|\mathbf{u}|^2\right) + (\nabla\times\mathbf{u})\times\mathbf{u} .
+$$
+
+Write $\boldsymbol{\xi}\equiv\nabla\times\mathbf{u}$ for the **relative vorticity** (the spin of the flow as seen in the rotating frame). Substituting and moving advection to the right,
+
+$$
+\frac{\partial\mathbf{u}}{\partial t} = -\boldsymbol{\xi}\times\mathbf{u} - 2\boldsymbol{\Omega}\times\mathbf{u} - \nabla\!\left(\tfrac12|\mathbf{u}|^2+\Phi\right) - \frac{1}{\rho}\nabla p .
+$$
+
+The two cross-product terms differ only by their coefficient vector, so they merge:
+
+$$
+-\boldsymbol{\xi}\times\mathbf{u} - 2\boldsymbol{\Omega}\times\mathbf{u} = -\bigl(2\boldsymbol{\Omega}+\nabla\times\mathbf{u}\bigr)\times\mathbf{u} .
+$$
+
+This is the paper's momentum equation exactly — bar the last term, still $-\rho^{-1}\nabla p$, which §7 will convert. The rearrangement earns its name, **vector-invariant form**[^vecinv], and carries a genuinely beautiful physical reading:
+
+- The combination $2\boldsymbol{\Omega} + \nabla\times\mathbf{u} \equiv \boldsymbol{\zeta}$ is the **absolute vorticity** — the vorticity of the flow as seen from non-rotating *inertial* space. The reason is a one-line calculation: solid-body rotation has velocity $\boldsymbol{\Omega}\times\mathbf{r}$ and vorticity $\nabla\times(\boldsymbol{\Omega}\times\mathbf{r})=2\boldsymbol{\Omega}$, so the inertial velocity $\mathbf{u}_a=\mathbf{u}+\boldsymbol{\Omega}\times\mathbf{r}$ has $\nabla\times\mathbf{u}_a = \boldsymbol{\xi}+2\boldsymbol{\Omega}$[^absvort]. So $2\boldsymbol{\Omega}$ is the **planetary vorticity** — the spin every parcel inherits simply by sitting on a turning planet. **Coriolis is therefore not a separate force at all: it is the planetary share of the vorticity.** This is why the discretisation gives vorticity its own variable and its own function space ($\mathbb{W}_1$, the companion's §4).
+- The kinetic energy $\tfrac12|\mathbf{u}|^2$ joins the geopotential under one gradient. The combination $\tfrac12|\mathbf{u}|^2+\Phi$ is a **Bernoulli potential**; along a steady streamline its gradient is what balances the vorticity term.
+- The vorticity-flux term $\boldsymbol{\zeta}\times\mathbf{u}$ (the glossary's $\mathbf{Q}$) is $\perp\mathbf{u}$ and so does **no work**. All of the flow's energy exchange is funnelled into the single gradient term — exactly the structure a discretisation wants if it is to conserve energy by construction.
+
+[^vecinv]: "Vector-invariant" because the equation is now built only from $\nabla(\cdot)$, $\nabla\times(\cdot)$, and cross products — operations defined without reference to any coordinate system — whereas the original $(\mathbf{u}\cdot\nabla)\mathbf{u}$ requires differentiating *vector components*, which on a curved, non-orthogonal mesh entangles the metric and Christoffel symbols. On the cubed sphere (companion §2) that distinction is the difference between a clean discretisation and a coordinate nightmare. The merged term $(\nabla\times\mathbf{u})\times\mathbf{u}$ is the **Lamb vector**; the rewrite of $(\mathbf{u}\cdot\nabla)\mathbf{u}$ is the Lamb–Gromeka identity.
+
+[^absvort]: Quick check with $\nabla\times(\mathbf{A}\times\mathbf{B})=\mathbf{A}(\nabla\cdot\mathbf{B})-\mathbf{B}(\nabla\cdot\mathbf{A})+(\mathbf{B}\cdot\nabla)\mathbf{A}-(\mathbf{A}\cdot\nabla)\mathbf{B}$ with $\mathbf{A}=\boldsymbol{\Omega}$ constant, $\mathbf{B}=\mathbf{r}$: the surviving terms are $\boldsymbol{\Omega}(\nabla\cdot\mathbf{r})-(\boldsymbol{\Omega}\cdot\nabla)\mathbf{r}=3\boldsymbol{\Omega}-\boldsymbol{\Omega}=2\boldsymbol{\Omega}$. Conservation of $\boldsymbol{\zeta}$ (more precisely of potential vorticity $\boldsymbol{\zeta}\cdot\nabla\theta/\rho$) is the master conservation law of large-scale atmospheric dynamics — Ertel's theorem — and the reason the $\mathbb{W}_1$/$\mathbb{W}_2$/$\mathbb{W}_3$ "compatible" spaces are chosen to mimic $\nabla\times$ and $\nabla\cdot$ exactly.
+
+---
+
+## 6. Thermodynamics I — the first law and potential temperature
+
+Now leave mechanics and bring in the gas itself. Two ingredients: the equation of state and the first law.
+
+**Ideal gas.** $p=\rho R T$, where $R$ is the **specific** gas constant — per unit *mass*, not per mole ($R=R_{\text{univ}}/M$; for dry air $R\approx287\,\mathrm{J\,kg^{-1}K^{-1}}$). Meteorology works per unit mass throughout, so specific heats $c_p, c_v$ are likewise per kilogram, related by Mayer's relation $c_p=c_v+R$ (dry air: $c_v=\tfrac52R$, $c_p=\tfrac72R$, so $\kappa\equiv R/c_p=2/7\approx0.286$, the glossary's $\kappa_d$).
+
+**First law.** For unit mass, $dq = du + p\,d\alpha$ with $\alpha=1/\rho$ the specific volume, $u$ the internal energy, $dq$ the heat added. For an ideal gas $du=c_v\,dT$, and a two-line manipulation puts the first law in the form a meteorologist prefers[^firstlaw]:
+
+$$
+dq = c_p\,dT - \alpha\,dp = c_p\,dT - \frac{1}{\rho}\,dp .
+$$
+
+**Adiabatic motion → potential temperature.** A parcel moving without exchanging heat has $dq=0$, so $c_p\,dT = \alpha\,dp = (RT/p)\,dp$, i.e.
+
+$$
+\frac{dT}{T} = \kappa\,\frac{dp}{p} \quad\Longrightarrow\quad T\,p^{-\kappa} = \text{const along the motion.}
+$$
+
+This is Poisson's adiabatic relation (the $T$–$p$ face of $pV^\gamma=\text{const}$, with $\kappa=(\gamma-1)/\gamma$). It motivates a change of variable: define the **potential temperature** as the temperature a parcel would reach if brought adiabatically to a reference pressure $p_0=1000\,\mathrm{hPa}=10^5\,\mathrm{Pa}$:
+
+$$
+\boxed{\;\theta \equiv T\left(\frac{p_0}{p}\right)^{\!\kappa}\;}
+$$
+
+By construction $\theta$ is **constant on an adiabat** (at $p=p_0$ it equals $T$; off it, it untwists the adiabatic $T$–$p$ dependence). Therefore a parcel in adiabatic motion carries its $\theta$ unchanged: $D\theta/Dt = 0$, which spelt out is
+
+$$
+\frac{\partial\theta}{\partial t} = -\mathbf{u}\cdot\nabla\theta
+$$
+
+— the paper's second equation, labelled the *energy* equation. **This is where thermodynamics enters the system:** the first law, specialised to heat-free motion, collapses into the pure advection of $\theta$. There are no source terms because the dry dynamical core admits no heating — radiation, condensation and friction, the diabatic terms that would sit on the right, are all parametrised elsewhere[^diabatic].
+
+**Why $\theta$ and not $T$: it is entropy.** Compute the specific entropy from $dq=T\,ds$ and the first law: $ds = c_p\,dT/T - R\,dp/p = c_p\,d(\ln\theta)$, hence
+
+$$
+s = c_p\ln\theta + \text{const.}
+$$
+
+So $\theta$ is, up to a constant and an exponential, the **entropy** of the gas — the very same $S=k_B\ln\Omega$ you know from statistical mechanics, here per unit mass. The "energy equation" $D\theta/Dt=0$ is thus the **second law in disguise**: in the absence of heating *and* of dissipation (both true for the inviscid dry core), entropy is materially conserved — the flow is **isentropic**[^isentropic]. Choosing $\theta$ as a prognostic variable means choosing a variable that the dynamics simply *advects*, which is both physically transparent and numerically benign.
+
+[^firstlaw]: From $dq=c_v\,dT+p\,d\alpha$, differentiate the gas law $p\alpha=RT$ to get $p\,d\alpha+\alpha\,dp=R\,dT$, so $p\,d\alpha=R\,dT-\alpha\,dp$. Then $dq=(c_v+R)\,dT-\alpha\,dp=c_p\,dT-\alpha\,dp$. The same step defines enthalpy $h=u+p\alpha$ with $dh=c_p\,dT$, so the form is "$dq=dh-\alpha\,dp$" — heat at constant pressure goes entirely into enthalpy.
+
+[^diabatic]: The full thermodynamic equation is $D\theta/Dt = (\theta/c_pT)\,\dot{q}$ with $\dot q$ the diabatic heating rate. Setting $\dot q=0$ is the defining choice of a *dry adiabatic dynamical core*: it is the conservative skeleton onto which moist physics and radiation are later coupled. In renormalisation language (companion §1), the diabatic terms are the effective theory of the integrated-out sub-grid scales; §2.1 is the bare, reversible action.
+
+[^isentropic]: Adiabatic ($dq=0$) controls heat exchange; isentropic ($ds=0$) additionally needs reversibility, i.e. no internal dissipation. The Euler core has neither heating nor viscous dissipation, so the two coincide and $D\theta/Dt=0$ is exact. Real flows generate entropy at shocks and in turbulence — handled, again, by parametrisation rather than by the dynamical core. Isentropic surfaces ($\theta=\text{const}$) are the natural "vertical coordinate" of theoretical dynamics, because adiabatic parcels are confined to them: a parcel slides along its $\theta$-surface like a bead on a wire.
+
+---
+
+## 7. Thermodynamics II — Exner pressure
+
+Now the one object genuinely new to you. The **Exner pressure** (or Exner function)[^exner] is a non-dimensionalised pressure:
+
+$$
+\boxed{\;\Pi \equiv \left(\frac{p}{p_0}\right)^{\!\kappa} = \frac{T}{\theta}\;}
+$$
+
+the second equality straight from $\theta=T(p_0/p)^\kappa$. Read it as: $\Pi$ is pressure measured on a *temperature-like* scale, and **temperature factorises as $T=\theta\,\Pi$** — into a "material" part $\theta$ (the entropy label, carried by the parcel) and a "mechanical" part $\Pi$ (the local pressure state). The change of thermodynamic coordinates $(T,p)\to(\theta,\Pi)$ is chosen so that one coordinate is materially conserved and the other carries the pressure force linearly. Two exact identities, both derived below, are the entire payoff.
+
+**(a) The pressure-gradient force becomes $c_p\theta\nabla\Pi$.** Differentiate the definition: $\nabla\Pi = \kappa(p/p_0)^\kappa\,\nabla p/p = \kappa\Pi\,\nabla p/p$. Therefore
+
+$$
+c_p\,\theta\,\nabla\Pi = c_p\,\theta\,\kappa\,\Pi\,\frac{\nabla p}{p}
+= (c_p\kappa)\,(\theta\Pi)\,\frac{\nabla p}{p}
+= R\,T\,\frac{\nabla p}{p}
+= \frac{RT}{p}\,\nabla p
+= \frac{1}{\rho}\,\nabla p ,
+$$
+
+using in turn $c_p\kappa=c_p(R/c_p)=R$, then $\theta\Pi=T$, then the gas law $RT/p=1/\rho$. So
+
+$$
+\frac{1}{\rho}\nabla p \;=\; c_p\,\theta\,\nabla\Pi \qquad\text{(exact for an ideal gas)} .
+$$
+
+This is the substitution that turns the §5 momentum equation into the paper's final form — the last term $-c_p\theta\nabla\Pi$ *is* the pressure-gradient force $-\rho^{-1}\nabla p$, with no approximation whatsoever. Why prefer it? Because $\rho^{-1}\nabla p$ is a *ratio* — nonlinear in $\rho$, and mixing variables awkwardly — whereas $c_p\theta\nabla\Pi$ is **bilinear** in the chosen state $(\theta,\Pi)$: a product of one variable and the gradient of another. That is precisely the structure the semi-implicit linearisation of the companion's §6 wants when it freezes a Jacobian.
+
+**(b) The equation of state is the ideal gas law in disguise.** Take $p=\rho R T$ and substitute $T=\theta\Pi$ and $p=p_0\Pi^{1/\kappa}$ (the latter by inverting $\Pi=(p/p_0)^\kappa$):
+
+$$
+p_0\,\Pi^{1/\kappa} = \rho R\,\theta\Pi
+\quad\Longrightarrow\quad
+\Pi^{\frac{1}{\kappa}-1} = \frac{R}{p_0}\,\rho\theta
+\quad\Longrightarrow\quad
+\boxed{\;\Pi^{\frac{1-\kappa}{\kappa}} = \frac{R}{p_0}\,\rho\theta\;}
+$$
+
+— the paper's closure, recovered exactly. It is nothing but $p=\rho RT$ rewritten in the variables $(\rho,\theta,\Pi)$, an **algebraic** (diagnostic) relation, not an evolution equation. The exponent tidies to $\tfrac{1-\kappa}{\kappa}=\tfrac1\kappa-1=\tfrac{c_p}{R}-1=\tfrac{c_v}{R}=\tfrac1{\gamma-1}$, which for dry air is $\tfrac52$.
+
+In short, Exner pressure is **not new physics** — it is a change of variable that *diagonalises* the thermodynamics: $T=\theta\Pi$, the pressure force collapses to $c_p\theta\nabla\Pi$, and the gas law becomes the multiplicative $\Pi^{c_v/R}\propto\rho\theta$. Everything it touches gets simpler.
+
+[^exner]: After **Felix Maria Exner** (1876–1930), an Austrian meteorologist and one of the founders of dynamic meteorology, who introduced the function in the 1900s. The Exner function is to pressure as potential temperature is to temperature: both are reference-$p_0$-normalised "potential" variables, and they are conjugate in exactly the way $T=\theta\Pi$ records. In some texts $\Pi$ carries a factor of $c_p$ (so that $c_p\theta\nabla\Pi\to\theta\nabla\Pi$); GungHo uses the dimensionless convention above, matching the glossary.
+
+---
+
+## 8. Putting it together — one system, two non-trivial joints
+
+Collecting §2–§7, the GungHo dynamical core is
+
+$$
+\begin{aligned}
+\frac{\partial\mathbf{u}}{\partial t} &= -\,(2\boldsymbol{\Omega}+\nabla\times\mathbf{u})\times\mathbf{u} - \nabla\!\left(\tfrac12\mathbf{u}\cdot\mathbf{u} + \Phi\right) - c_p\,\theta\,\nabla\Pi, & &\text{(momentum: Newton, rotating, inviscid)}\\[2pt]
+\frac{\partial\theta}{\partial t} &= -\,\mathbf{u}\cdot\nabla\theta, & &\text{(energy: first law, adiabatic = isentropic)}\\[2pt]
+\frac{\partial\rho}{\partial t} &= -\,\nabla\cdot(\rho\mathbf{u}), & &\text{(mass: continuity)}
+\end{aligned}
+\qquad
+\Pi^{\frac{1-\kappa}{\kappa}} = \frac{R}{p_0}\,\rho\theta. \quad\text{(state: ideal gas)}
+$$
+
+**How much of the "gluing" is non-trivial?** Most of it is not. Each evolution equation is simply *one conservation law written at a fixed point* — mass, momentum, energy — and they do not interact in any subtle way; they are merely listed together. The two joints where physics genuinely had to be reshaped to fit are both thermodynamic, and both were derived in §7:
+
+1. the pressure-gradient force re-expressed as $c_p\theta\nabla\Pi$ — an *exact* ideal-gas identity, the thing that lets $(\theta,\Pi)$ serve as working variables in the momentum equation at all;
+2. the equation of state $\Pi^{(1-\kappa)/\kappa}=\tfrac{R}{p_0}\rho\theta$ — the ideal gas law rewritten so that $\Pi$ closes the set.
+
+Everything else — Newton, the control-volume mass balance, the adiabatic first law — is written down directly. The system is genuinely modular in exactly the three pieces your intuition named.
+
+**What the coupling actually does.** The equation of state carries no time derivative, so $\Pi$ is *diagnosed* instantaneously from $(\rho,\theta)$; it is the channel through which the parcels feel pressure. Trace the dependence: $\mathbf{u}$ advects both $\rho$ (continuity) and $\theta$ (energy); those set $\Pi$ (state); and $\Pi$ pushes back on $\mathbf{u}$ (the $c_p\theta\nabla\Pi$ term). That closed loop —
+
+$$
+\mathbf{u} \xrightarrow{\text{compress}} \rho,\theta \xrightarrow{\text{state}} \Pi \xrightarrow{\text{push}} \mathbf{u}
+$$
+
+— *is* a **sound wave**: squeeze the gas, the pressure rises, the pressure-gradient force pushes back, overshoots, and oscillates, at $c_s=\sqrt{\gamma R T}\approx340\,\mathrm{m\,s^{-1}}$. The same equations carry **gravity waves** (buoyancy restoring vertically displaced $\theta$-surfaces against $\nabla\Phi$) and **Rossby waves** (meridional gradient of the planetary vorticity $2\boldsymbol{\Omega}$). These fast modes — an order of magnitude quicker than the $\sim10\,\mathrm{m\,s^{-1}}$ winds that constitute weather — are the **stiffness** of the system. They are physically correct and numerically expensive, and taming them without resolving them in time is the reason the rest of LFRic exists.
+
+That is the punchline worth carrying forward: §2.1 is where the difficulty is *born* (a stiff, compressible, rotating, thermodynamically-coupled hyperbolic system), and the spatial discretisation, semi-implicit timestep, and bespoke linear solver of the [wider companion](paper-explained.qmd) (§4, §6, §7) are the apparatus for *surviving* it.
+
+---
+
+## Summary
+
+| Pillar | Paper object | Formal content | Your nearest neighbour |
+|---|---|---|---|
+| Description | state $(\mathbf{u},\rho,\theta,\Pi)$ | Eulerian fields; material derivative $D/Dt=\partial_t+\mathbf{u}\cdot\nabla$ | Lagrangian vs Eulerian; convective derivative |
+| Mass | $\partial_t\rho=-\nabla\cdot(\rho\mathbf{u})$ | local conservation law; $D\rho/Dt=-\rho\nabla\cdot\mathbf{u}$ | charge conservation $\partial_t\rho_q+\nabla\cdot\mathbf{J}=0$ |
+| Momentum | $\rho\,D\mathbf{u}/Dt=-\nabla p+\rho\mathbf{g}$ | Newton's 2nd law, inviscid (Euler) | drop viscous $\mu\nabla^2\mathbf{u}$; $\mathrm{Re}\sim10^{12}$ |
+| Rotating frame | $-2\boldsymbol{\Omega}\times\mathbf{u}$, $\Phi$ | Coriolis (no work) + centrifugal $\to$ geopotential | $q\mathbf{v}\times\mathbf{B}$; geoid as equipotential |
+| Vector-invariant | $(2\boldsymbol{\Omega}+\nabla\times\mathbf{u})\times\mathbf{u}$ | absolute vorticity $\boldsymbol{\zeta}=2\boldsymbol{\Omega}+\boldsymbol{\xi}$; Coriolis = planetary vorticity | Lamb–Gromeka identity; Ertel PV |
+| Potential temperature | $\partial_t\theta=-\mathbf{u}\cdot\nabla\theta$ | adiabatic 1st law; $\theta=T(p_0/p)^\kappa$; $s=c_p\ln\theta$ | entropy $S=k_B\ln\Omega$; isentropic flow |
+| Exner pressure | $\Pi=(p/p_0)^\kappa=T/\theta$ | $\rho^{-1}\nabla p=c_p\theta\nabla\Pi$ exactly; diagonalises thermo | a change of variables, not new physics |
+| State | $\Pi^{(1-\kappa)/\kappa}=\tfrac{R}{p_0}\rho\theta$ | ideal gas $p=\rho RT$ in $(\rho,\theta,\Pi)$; exponent $c_v/R$ | algebraic closure; $\Pi$ diagnosed, not marched |
+| Assembly | the coupled set | mass+momentum+energy+EOS; two thermodynamic joints | acoustic/gravity/Rossby waves $\Rightarrow$ stiffness |
+
+**Reading map.** This entire note unpacks the single block of equations in Adams et al. (2019) **§2.1** (the source equations (1)–(4), `LFRic.tex` lines 305–316). For the same equations read at systems level — why each variable lands in the function space it does, and how the stiffness drives the timestep and solver — see [Paper, Explained](paper-explained.qmd) **§3** (state), **§4** (compatible finite elements), **§6** (semi-implicit time), **§7** (the pressure solve). Symbols and constants: the [glossary](glossary.qmd).
