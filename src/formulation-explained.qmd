@@ -5,22 +5,53 @@ subtitle: "A personal note for the mathematically conversant but possibly rusty"
 
 A ground-up companion to §2.1 *Formulation* of [Adams et al. (2019)](https://arxiv.org/abs/1809.07267) (source in [`submodules/arXiv-1809.07267/`](paper.qmd)). The wider companion [Paper, Explained](paper-explained.qmd) *states* these equations (its §3) and reads them at the level of someone who already speaks fluid dynamics; this note instead **derives** them from scratch — Newton's second law, the first law of thermodynamics, a rotating frame — at the level of an undergraduate physics course, for a reader whose graduate fluids has gone rusty. Standard results are recalled, not assumed; the two genuinely unfamiliar objects (potential temperature $\theta$, Exner pressure $\Pi$) get a full account. Terms are in the [glossary](glossary.qmd); a reading map is at the end.
 
-**The essence.** The four equations look formidable but are nothing exotic. They are the three great conservation laws — **mass, momentum, energy** — for a compressible ideal gas, written at a fixed point in a frame rotating with the Earth, and then dressed in two thermodynamic variables $(\theta, \Pi)$ chosen so that the pressure-gradient force and the equation of state both come out clean. Strip the costume and underneath is first-year physics. Here is the map, which is also this note's outline:
+**The essence.** The four equations look formidable but are nothing exotic. They are the three great conservation laws — **mass, momentum, energy** — for a compressible ideal gas, written at a fixed point in a frame rotating with the Earth, and then dressed in two thermodynamic variables $(\theta, \Pi)$ chosen so that the pressure-gradient force and the equation of state both come out clean. Strip the costume and underneath is first-year physics. Your own instinct in posing this was exactly right: *compressible-fluid PDEs + thermodynamics + non-inertial frame* — we build those three pillars separately in §2–§7 and glue them in §8, where only two joints turn out to be non-trivial, and both are thermodynamic.
 
-| Paper equation | The physics underneath | Built in |
-|---|---|---|
-| $\partial_t\rho = -\nabla\cdot(\rho\mathbf{u})$ | conservation of **mass** | §2 |
-| $\partial_t\mathbf{u} = -(2\boldsymbol{\Omega}+\nabla\times\mathbf{u})\times\mathbf{u} - \nabla(\tfrac12\mathbf{u}\cdot\mathbf{u}+\Phi) - c_p\theta\nabla\Pi$ | Newton's 2nd law (inviscid) in a **rotating frame**, rearranged | §3–§5, §7 |
-| $\partial_t\theta = -\mathbf{u}\cdot\nabla\theta$ | first law of **thermodynamics**, adiabatic = entropy conservation | §6 |
-| $\Pi^{(1-\kappa)/\kappa} = \tfrac{R}{p_0}\rho\theta$ | the **ideal gas law**, in disguise | §7 |
+---
 
-Your own instinct in posing this was exactly right: *compressible-fluid PDEs + thermodynamics + non-inertial frame*. We build those three pillars separately and glue them in §8 — where it turns out only two joints are non-trivial, and both are thermodynamic.
+## The statement, up front
+
+Stated as one would a proposition — assumptions, the laws invoked, the variables, then the four equations — so the rest of the note reads as its proof. If you only want the result it is here; everything below is derivation.
+
+**Assumptions.**
+
+- **Continuum.** The gas is smooth fields, not molecules — valid because the mean free path ($\sim0.1\,\mu\mathrm{m}$) is vastly below any resolved scale.
+- **Dry ideal gas.** A single perfect gas, $p=\rho R T$; no moisture, no phase change.
+- **Inviscid (Euler).** Molecular viscosity and diffusion dropped for the resolved flow (§3).
+- **Adiabatic and reversible.** No heating and no internal dissipation: the resolved dynamics is conservative and time-reversible; every irreversible, diabatic process is sub-grid and parametrised elsewhere (§6, §8).
+- **Rotating frame.** Written in the frame co-rotating with the Earth at steady rate $\boldsymbol{\Omega}$ (§4).
+- **Thin spherical shell.** The spatial domain is the global atmosphere, a shell whose thickness ($\sim$tens of km) is minute against the Earth's radius ($a\approx6371\,\mathrm{km}$), so gravity and rotation single out preferred vertical and axial directions (§1).
+
+**Laws invoked.** Conservation of mass; Newton's second law (momentum); the first and second laws of thermodynamics; the ideal-gas equation of state.
+
+**Unknowns** — prognostic fields of $(\mathbf{x},t)$: velocity $\mathbf{u}$, density $\rho$, potential temperature $\theta$, Exner pressure $\Pi$ (six scalars, since $\mathbf{u}$ has three components).
+
+**Given constants/parameters:** rotation rate $\boldsymbol{\Omega}$; geopotential $\Phi$ (gravity + centrifugal, §4); reference pressure $p_0=10^5\,\mathrm{Pa}$; specific gas constant $R$; specific heat at constant pressure $c_p$; and $\kappa\equiv R/c_p\approx2/7$ ([Appendix](#sec-idealgas)).
+
+**Proposition — the GungHo equations.** Under these assumptions the state evolves by
+
+$$
+\begin{aligned}
+\frac{\partial\mathbf{u}}{\partial t} &= -(2\boldsymbol{\Omega}+\nabla\times\mathbf{u})\times\mathbf{u} \\
+&\quad - \nabla\!\left(\tfrac12\mathbf{u}\cdot\mathbf{u}+\Phi\right) - c_p\theta\nabla\Pi, \\
+\frac{\partial\theta}{\partial t} &= -\mathbf{u}\cdot\nabla\theta, \\
+\frac{\partial\rho}{\partial t} &= -\nabla\cdot(\rho\mathbf{u}),
+\end{aligned}
+$$
+
+closed by the equation of state
+
+$$
+\Pi^{\frac{1-\kappa}{\kappa}} = \frac{R}{p_0}\,\rho\theta .
+$$
+
+The rest of the note is the proof, one term at a time: **§2** mass, **§3–§5** momentum (Newton → rotating frame → vector-invariant rearrangement), **§6** energy and $\theta$, **§7** the variable $\Pi$ and the pressure term, **§8** assembly and what the coupled system then does.
 
 ---
 
 ## 1. Reading the equations: fields, parcels, and the material derivative
 
-The unknowns are **fields** over a thin spherical shell: the wind $\mathbf{u}(\mathbf{x},t)$, density $\rho(\mathbf{x},t)$, potential temperature $\theta(\mathbf{x},t)$, Exner pressure $\Pi(\mathbf{x},t)$ — each a function of position and time. This is the **Eulerian** description: stand at a fixed point $\mathbf{x}$ and watch the fluid stream past. Its opposite is the **Lagrangian** description: pick a material parcel and ride along with it. The whole of §2.1 is written Eulerian (the time derivative on every left-hand side is $\partial_t$ at fixed $\mathbf{x}$), but the *physics* — Newton, the first law — is naturally stated for a parcel, so the two viewpoints must be reconciled before anything else.
+The unknowns are **fields**: the wind $\mathbf{u}(\mathbf{x},t)$, density $\rho(\mathbf{x},t)$, potential temperature $\theta(\mathbf{x},t)$, Exner pressure $\Pi(\mathbf{x},t)$ — each a function of position and time, defined throughout the model's spatial **domain**, the global atmosphere. That domain is the *thin spherical shell* of the assumptions: consequential atmosphere only tens of km deep wrapped on a sphere of radius $\sim$6371 km, so thin that gravity makes the vertical a special, strongly stratified direction handled unlike the horizontal throughout LFRic. Keep the *domain* distinct from the *element*: the equations are **local** — each is got by applying a conservation law to an *infinitesimal* parcel, a single point of the shell, and is therefore a pointwise PDE. The thin shell is the global stage the fields are defined on; the infinitesimal control volume is the device we shrink to a point to *derive* those laws (§2). The field picture is the **Eulerian** description: stand at a fixed point $\mathbf{x}$ and watch the fluid stream past. Its opposite is the **Lagrangian** description: pick a material parcel and ride along with it. The whole of §2.1 is written Eulerian (the time derivative on every left-hand side is $\partial_t$ at fixed $\mathbf{x}$), but the *physics* — Newton, the first law — is naturally stated for a parcel, so the two viewpoints must be reconciled before anything else.
 
 The bridge is the **material derivative** (also: total, substantial, convective derivative). The rate of change of a quantity $q$ *seen by an observer riding the flow* is, by the chain rule on $q(\mathbf{x}(t),t)$ with $\dot{\mathbf{x}}=\mathbf{u}$,
 
@@ -84,7 +115,7 @@ This is the whole of momentum dynamics, in the inertial frame, with the pressure
 
 [^pgforce]: The net pressure force on a parcel is $-\oint_{\partial V} p\,d\mathbf{A} = -\int_V \nabla p\,dV$ (the gradient theorem), so per unit volume it is $-\nabla p$. Only the *gradient* enters — a uniform pressure squeezes a parcel from all sides and produces no net force, which is why weather depends on pressure *differences*, not absolute pressure.
 
-[^euler]: Euler (1757), a century before Navier and Stokes added viscosity. Neglecting viscosity is justified for the **resolved** flow: the atmospheric Reynolds number is astronomical ($\sim 10^{12}$), so molecular viscosity is utterly negligible at the mesh scale. The real dissipation lives in unresolved turbulence and is handled separately by **physics parametrisations** — deliberately outside the dynamical core, and outside §2.1. The dynamical core is the *conservative, reversible* skeleton; the irreversible flesh is bolted on elsewhere.
+[^euler]: Euler (1757), a century before Navier and Stokes added viscosity. Neglecting viscosity is justified for the **resolved** flow by the **Reynolds number** $\mathrm{Re}=UL/\nu$ — the ratio of inertial to viscous forces in the flow. With a wind $U\sim10\,\mathrm{m\,s^{-1}}$, a synoptic length $L\sim10^{6}\,\mathrm{m}$, and air's kinematic viscosity $\nu\sim1.5\times10^{-5}\,\mathrm{m^2\,s^{-1}}$, $\mathrm{Re}\sim10^{12}$: inertia outweighs molecular friction by twelve orders of magnitude, so the viscous term $\mu\nabla^2\mathbf{u}$ is utterly negligible at resolved scales. It does not leave the physics — it re-enters, repackaged, as turbulent mixing in the **physics parametrisations**, deliberately outside the dynamical core and outside §2.1. The dynamical core is the *conservative, reversible* skeleton; the irreversible flesh is bolted on elsewhere.
 
 ---
 
@@ -174,7 +205,7 @@ This is the paper's momentum equation exactly — bar the last term, still $-\rh
 
 Now leave mechanics and bring in the gas itself. Two ingredients: the equation of state and the first law.
 
-**Ideal gas.** $p=\rho R T$, where $R$ is the **specific** gas constant — per unit *mass*, not per mole ($R=R_{\text{univ}}/M$; for dry air $R\approx287\,\mathrm{J\,kg^{-1}K^{-1}}$). Meteorology works per unit mass throughout, so specific heats $c_p, c_v$ are likewise per kilogram, related by Mayer's relation $c_p=c_v+R$ (dry air: $c_v=\tfrac52R$, $c_p=\tfrac72R$, so $\kappa\equiv R/c_p=2/7\approx0.286$, the glossary's $\kappa_d$).
+**Ideal gas.** $p=\rho R T$, where $R$ is the **specific** gas constant — per unit *mass*, not per mole ($R=R_{\text{univ}}/M$; for dry air $R\approx287\,\mathrm{J\,kg^{-1}K^{-1}}$). Meteorology works per unit mass throughout, so specific heats $c_p, c_v$ are likewise per kilogram, related by Mayer's relation $c_p=c_v+R$ (dry air: $c_v=\tfrac52R$, $c_p=\tfrac72R$, so $\kappa\equiv R/c_p=2/7\approx0.286$, the glossary's $\kappa_d$; that $2/7$ is fixed by counting the gas's degrees of freedom — see the [Appendix](#sec-idealgas)).
 
 **First law.** For unit mass, $dq = du + p\,d\alpha$ with $\alpha=1/\rho$ the specific volume, $u$ the internal energy, $dq$ the heat added. For an ideal gas $du=c_v\,dT$, and a two-line manipulation puts the first law in the form a meteorologist prefers[^firstlaw]:
 
@@ -244,7 +275,7 @@ $$
 \frac{1}{\rho}\nabla p \;=\; c_p\,\theta\,\nabla\Pi \qquad\text{(exact for an ideal gas)} .
 $$
 
-This is the substitution that turns the §5 momentum equation into the paper's final form — the last term $-c_p\theta\nabla\Pi$ *is* the pressure-gradient force $-\rho^{-1}\nabla p$, with no approximation whatsoever. Why prefer it? Because $\rho^{-1}\nabla p$ is a *ratio* — nonlinear in $\rho$, and mixing variables awkwardly — whereas $c_p\theta\nabla\Pi$ is **bilinear** in the chosen state $(\theta,\Pi)$: a product of one variable and the gradient of another. That is precisely the structure the semi-implicit linearisation of the companion's §6 wants when it freezes a Jacobian.
+This is the substitution that turns the §5 momentum equation into the paper's final form — the last term $-c_p\theta\nabla\Pi$ *is* the pressure-gradient force $-\rho^{-1}\nabla p$, with no approximation whatsoever. Why prefer it? Because $\rho^{-1}\nabla p$ is a *ratio* — nonlinear in $\rho$, and mixing variables awkwardly — whereas $c_p\theta\nabla\Pi$ is **bilinear** in the chosen state $(\theta,\Pi)$: a product of one variable and the gradient of another. That is precisely the structure the semi-implicit linearisation of the companion's §6 wants when it freezes a Jacobian — though that numerical payoff was no part of why $\Pi$ was invented[^exnerhistory].
 
 **(b) The equation of state is the ideal gas law in disguise.** Take $p=\rho R T$ and substitute $T=\theta\Pi$ and $p=p_0\Pi^{1/\kappa}$ (the latter by inverting $\Pi=(p/p_0)^\kappa$):
 
@@ -256,11 +287,15 @@ p_0\,\Pi^{1/\kappa} = \rho R\,\theta\Pi
 \boxed{\;\Pi^{\frac{1-\kappa}{\kappa}} = \frac{R}{p_0}\,\rho\theta\;}
 $$
 
-— the paper's closure, recovered exactly. It is nothing but $p=\rho RT$ rewritten in the variables $(\rho,\theta,\Pi)$, an **algebraic** (diagnostic) relation, not an evolution equation. The exponent tidies to $\tfrac{1-\kappa}{\kappa}=\tfrac1\kappa-1=\tfrac{c_p}{R}-1=\tfrac{c_v}{R}=\tfrac1{\gamma-1}$, which for dry air is $\tfrac52$.
+— the paper's closure, recovered exactly. It is nothing but $p=\rho RT$ rewritten in the variables $(\rho,\theta,\Pi)$, an **algebraic** (diagnostic) relation, not an evolution equation. The exponent tidies to $\tfrac{1-\kappa}{\kappa}=\tfrac1\kappa-1=\tfrac{c_p}{R}-1=\tfrac{c_v}{R}=\tfrac1{\gamma-1}$, which for dry air is $\tfrac52$ — literally half the gas's degrees of freedom ([Appendix](#sec-idealgas)).
 
-In short, Exner pressure is **not new physics** — it is a change of variable that *diagonalises* the thermodynamics: $T=\theta\Pi$, the pressure force collapses to $c_p\theta\nabla\Pi$, and the gas law becomes the multiplicative $\Pi^{c_v/R}\propto\rho\theta$. Everything it touches gets simpler.
+In short, Exner pressure is **not new physics** — it is a change of variable that *diagonalises* the thermodynamics[^diagonalise]: $T=\theta\Pi$, the pressure force collapses to $c_p\theta\nabla\Pi$, and the gas law becomes the multiplicative $\Pi^{c_v/R}\propto\rho\theta$. Everything it touches gets simpler.
 
 [^exner]: After **Felix Maria Exner** (1876–1930), an Austrian meteorologist and one of the founders of dynamic meteorology, who introduced the function in the 1900s. The Exner function is to pressure as potential temperature is to temperature: both are reference-$p_0$-normalised "potential" variables, and they are conjugate in exactly the way $T=\theta\Pi$ records. In some texts $\Pi$ carries a factor of $c_p$ (so that $c_p\theta\nabla\Pi\to\theta\nabla\Pi$); GungHo uses the dimensionless convention above, matching the glossary.
+
+[^exnerhistory]: A serendipity of timing, not of cause. Felix Exner introduced the function around 1917 (*Dynamische Meteorologie*) for **analytical** tidiness — the pressure-gradient force and adiabatic/isentropic dynamics are simply cleaner in $(\theta,\Pi)$ — decades before numerical weather prediction existed (Charney–Fjørtoft–von Neumann, 1950) and longer still before the semi-implicit schemes (Robert; Kwizak & Robert, 1970s) that prize the bilinear $c_p\theta\nabla\Pi$. So the modern numerical usefulness was unforeseeable at discovery. It is not dumb luck either: the *same* structural fact — that $T=\theta\Pi$ factorises temperature into an entropy part and a pressure part — is what makes $\Pi$ convenient both analytically and numerically. The form was found for one good reason and cashed out, much later, for another.
+
+[^diagonalise]: "Diagonalise" is by analogy, and means more than the single bilinear identity. The change $(T,p)\to(\theta,\Pi)$ gives each new variable one clean, decoupled role: $\theta$ becomes a pure **material invariant** — its evolution is homogeneous advection $D\theta/Dt=0$, with *no* pressure term in it at all — while $\Pi$ becomes the sole carrier of the **pressure force**. The cross-coupling that entangles $T$ and $p$ in the primitive equations (temperature sitting in the pressure force, pressure in the energy equation) is gone. The bilinear $\rho^{-1}\nabla p = c_p\theta\nabla\Pi$ is one visible symptom of that role-separation, not the whole of it.
 
 ---
 
@@ -270,13 +305,15 @@ Collecting §2–§7, the GungHo dynamical core is
 
 $$
 \begin{aligned}
-\frac{\partial\mathbf{u}}{\partial t} &= -\,(2\boldsymbol{\Omega}+\nabla\times\mathbf{u})\times\mathbf{u} - \nabla\!\left(\tfrac12\mathbf{u}\cdot\mathbf{u} + \Phi\right) - c_p\,\theta\,\nabla\Pi, & &\text{(momentum: Newton, rotating, inviscid)}\\[2pt]
-\frac{\partial\theta}{\partial t} &= -\,\mathbf{u}\cdot\nabla\theta, & &\text{(energy: first law, adiabatic = isentropic)}\\[2pt]
-\frac{\partial\rho}{\partial t} &= -\,\nabla\cdot(\rho\mathbf{u}), & &\text{(mass: continuity)}
+\frac{\partial\mathbf{u}}{\partial t} &= -(2\boldsymbol{\Omega}+\nabla\times\mathbf{u})\times\mathbf{u} \\
+&\quad - \nabla\!\left(\tfrac12\mathbf{u}\cdot\mathbf{u} + \Phi\right) - c_p\,\theta\,\nabla\Pi, \\
+\frac{\partial\theta}{\partial t} &= -\,\mathbf{u}\cdot\nabla\theta, \\
+\frac{\partial\rho}{\partial t} &= -\,\nabla\cdot(\rho\mathbf{u}), \\
+\Pi^{\frac{1-\kappa}{\kappa}} &= \frac{R}{p_0}\,\rho\theta .
 \end{aligned}
-\qquad
-\Pi^{\frac{1-\kappa}{\kappa}} = \frac{R}{p_0}\,\rho\theta. \quad\text{(state: ideal gas)}
 $$
+
+Line by line: **momentum** (Newton, rotating, inviscid), **energy** (adiabatic first law = isentropic), **mass** (continuity), and the **equation of state** (ideal gas).
 
 **How much of the "gluing" is non-trivial?** Most of it is not. Each evolution equation is simply *one conservation law written at a fixed point* — mass, momentum, energy — and they do not interact in any subtle way; they are merely listed together. The two joints where physics genuinely had to be reshaped to fit are both thermodynamic, and both were derived in §7:
 
@@ -291,9 +328,19 @@ $$
 \mathbf{u} \xrightarrow{\text{compress}} \rho,\theta \xrightarrow{\text{state}} \Pi \xrightarrow{\text{push}} \mathbf{u}
 $$
 
-— *is* a **sound wave**: squeeze the gas, the pressure rises, the pressure-gradient force pushes back, overshoots, and oscillates, at $c_s=\sqrt{\gamma R T}\approx340\,\mathrm{m\,s^{-1}}$. The same equations carry **gravity waves** (buoyancy restoring vertically displaced $\theta$-surfaces against $\nabla\Phi$) and **Rossby waves** (meridional gradient of the planetary vorticity $2\boldsymbol{\Omega}$). These fast modes — an order of magnitude quicker than the $\sim10\,\mathrm{m\,s^{-1}}$ winds that constitute weather — are the **stiffness** of the system. They are physically correct and numerically expensive, and taming them without resolving them in time is the reason the rest of LFRic exists.
+— *is* a **sound (acoustic) wave**: compress the gas, the pressure rises, the pressure-gradient force pushes back, overshoots, and rings, at $c_s=\sqrt{\gamma RT}\approx340\,\mathrm{m\,s^{-1}}$. The same four equations support a small zoo of waves, each told apart by its **restoring force**:
 
-That is the punchline worth carrying forward: §2.1 is where the difficulty is *born* (a stiff, compressible, rotating, thermodynamically-coupled hyperbolic system), and the spatial discretisation, semi-implicit timestep, and bespoke linear solver of the [wider companion](paper-explained.qmd) (§4, §6, §7) are the apparatus for *surviving* it.
+- **Acoustic** — restored by compressibility (pressure); fast and nearly isotropic, $\sim340\,\mathrm{m\,s^{-1}}$.
+- **Gravity (buoyancy) waves** — restored by buoyancy, as gravity $\nabla\Phi$ pulls a vertically displaced $\theta$-surface back towards its level; *internal* modes are slow ($\sim$tens of $\mathrm{m\,s^{-1}}$), but the fastest *external* (Lamb) mode is acoustic-fast, $\sim300\,\mathrm{m\,s^{-1}}$.
+- **Rossby waves** — restored by the meridional gradient of the planetary vorticity $2\boldsymbol{\Omega}$ (the $\beta$-effect); these are *slow* ($\sim$a few $\mathrm{m\,s^{-1}}$), planetary-scale, and — crucially — they *are* the balanced, weather-carrying motion we actually want to resolve well.
+
+So the system carries motions whose speeds span well over an order of magnitude: fast acoustic and external-gravity modes ($\sim$300–340 $\mathrm{m\,s^{-1}}$) riding on the slow advective and Rossby dynamics ($\sim$10–50 $\mathrm{m\,s^{-1}}$) that is the actual weather. That spread of timescales is what numerical analysts call **stiffness**[^stiff]: the *fastest* mode, not the most interesting one, sets the largest stable step of an *explicit* integrator through the CFL condition, forcing steps some 20–30× shorter than accuracy on the slow modes would need. The fast waves are physically real and must be kept — the gas is genuinely compressible — but resolving them *in time* is ruinously expensive. LFRic's answer is a **semi-implicit** timestep: treat the fast, *linear* wave terms implicitly (A-stable, no CFL limit) and step the slow, nonlinear advection explicitly.
+
+That is the punchline worth carrying forward: §2.1 is where the difficulty is *born* — a stiff, compressible, rotating, thermodynamically-coupled hyperbolic system — and the spatial discretisation, semi-implicit timestep, and bespoke linear solver of the [wider companion](paper-explained.qmd) (§4, §6, §7) are the apparatus for *surviving* it.
+
+**Why "reversible" keeps recurring — a Wilsonian reading.** Notice what the assumptions bought: with no viscosity (§3) and no heating (§6), the resolved dynamics is *conservative and time-reversible* — run it backwards and it is still a valid solution; the entropy label $\theta$ is merely advected, never produced. This is deliberate, and your reading of it is exactly right. The dynamical core is the **large-scale effective theory** of the atmosphere, and at that scale the leading-order physics *is* this reversible, conservative dynamics. Irreversibility — turbulent mixing, friction, condensation, radiation — lives below the mesh cutoff and re-enters only as parametrised source terms on the right-hand sides. That is exactly the Wilsonian / effective-field-theory picture the companion gestures at (its §1 "renormalisation" footnote): the mesh is a UV cutoff; §2.1 is the bare, reversible "action"; the parametrisations are the coefficients of the integrated-out short-distance physics, *fitted* rather than *derived*. Reversibility is therefore not an idealisation we are stuck with — it is the organising principle that cleaves "what the core must get exactly right" from "what is modelled approximately below the grid".
+
+[^stiff]: Stiffness, in numerical ODEs: a system is stiff when the eigenvalues of its Jacobian span a wide range of magnitudes, so that *stability*, not *accuracy*, caps an explicit integrator's step. Here the eigenvalues are wave frequencies; the acoustic ones are $\sim20$–30× the advective ones, so an explicit step would be $\sim20$–30× smaller than the dynamics of interest warrants — nearly all the cost spent merely keeping fast waves stable. The cure is to integrate the stiff (fast, linear) part *implicitly*: implicit schemes can be A-stable, ignoring the CFL limit, at the price of a global linear solve each step (the companion's §7).
 
 ---
 
@@ -311,4 +358,37 @@ That is the punchline worth carrying forward: §2.1 is where the difficulty is *
 | State | $\Pi^{(1-\kappa)/\kappa}=\tfrac{R}{p_0}\rho\theta$ | ideal gas $p=\rho RT$ in $(\rho,\theta,\Pi)$; exponent $c_v/R$ | algebraic closure; $\Pi$ diagnosed, not marched |
 | Assembly | the coupled set | mass+momentum+energy+EOS; two thermodynamic joints | acoustic/gravity/Rossby waves $\Rightarrow$ stiffness |
 
-**Reading map.** This entire note unpacks the single block of equations in Adams et al. (2019) **§2.1** (the source equations (1)–(4), `LFRic.tex` lines 305–316). For the same equations read at systems level — why each variable lands in the function space it does, and how the stiffness drives the timestep and solver — see [Paper, Explained](paper-explained.qmd) **§3** (state), **§4** (compatible finite elements), **§6** (semi-implicit time), **§7** (the pressure solve). Symbols and constants: the [glossary](glossary.qmd).
+**Reading map.** This entire note unpacks the single block of equations in Adams et al. (2019) **§2.1** (the source equations (1)–(4), `LFRic.tex` lines 305–316). For the same equations read at systems level — why each variable lands in the function space it does, and how the stiffness drives the timestep and solver — see [Paper, Explained](paper-explained.qmd) **§3** (state), **§4** (compatible finite elements), **§6** (semi-implicit time), **§7** (the pressure solve). Symbols and constants: the [glossary](glossary.qmd); the [Appendix](#sec-idealgas) recalls the ideal-gas constants $(R,c_v,c_p,\gamma,\kappa)$ from molecular degrees of freedom.
+
+---
+
+## Appendix — Ideal-gas relations, recalled {#sec-idealgas}
+
+Where do $\kappa=2/7$, $\gamma=7/5$ and the equation-of-state exponent $c_v/R=5/2$ come from? All four thermodynamic constants $(R,c_v,c_p,\gamma)$ are fixed by a single integer — the number of active molecular degrees of freedom $f$ — through equipartition.
+
+**Equipartition.** In thermal equilibrium each quadratic degree of freedom carries mean energy $\tfrac12 k_B T$ per molecule, hence $\tfrac12 RT$ per unit mass (with $R$ the *specific* gas constant). A molecule with $f$ active quadratic DoFs therefore has specific internal energy $u=\tfrac{f}{2}RT$, so
+
+$$
+c_v \equiv \frac{\partial u}{\partial T} = \frac{f}{2}\,R .
+$$
+
+**Mayer's relation** $c_p=c_v+R$ (the first law at constant pressure, §6) then fixes everything else:
+
+$$
+\begin{aligned}
+c_v &= \tfrac{f}{2}R, & c_p &= c_v+R = \tfrac{f+2}{2}R, \\
+\gamma &= \frac{c_p}{c_v} = \frac{f+2}{f}, & \kappa &= \frac{R}{c_p} = \frac{2}{f+2}, \\
+\frac{c_v}{R} &= \frac{f}{2} = \frac{1}{\gamma-1}. &&
+\end{aligned}
+$$
+
+Every thermodynamic constant in §6–§7 is one of these. In particular the equation-of-state exponent is $\tfrac{1-\kappa}{\kappa}=\tfrac1\kappa-1=\tfrac{c_p}{R}-1=\tfrac{c_v}{R}=\tfrac{f}{2}$ — it *is* the half-degrees-of-freedom, nothing more.
+
+| Gas | $f$ | $c_v/R$ | $c_p/R$ | $\gamma$ | $\kappa=R/c_p$ |
+|---|---|---|---|---|---|
+| Monatomic (He, Ar) | 3 (translation) | $3/2$ | $5/2$ | $5/3\approx1.67$ | $2/5=0.40$ |
+| Diatomic (N$_2$, O$_2$) | 5 (3 trans + 2 rot) | $5/2$ | $7/2$ | $7/5=1.40$ | $2/7\approx0.286$ |
+
+Dry air is $\approx$78% N$_2$ and 21% O$_2$, both diatomic, so $f=5$: the two rotational modes are thermally active at atmospheric temperatures, but the vibrational mode is "frozen out" (its quantum level spacing $\gg k_B T$), which is why $f=5$ and not $7$. Hence $\gamma=7/5$, $\kappa=2/7\approx0.286$ — matching the glossary's measured $\kappa_d=0.2856$ to within real-gas and composition corrections — and the EOS exponent $c_v/R=5/2$. That is the $\tfrac52$ of §7, traced to its root: **dry air is a diatomic gas with five active degrees of freedom.**
+
+A reminder on **specific vs molar**. Meteorology works *per unit mass*: $R=R_{\text{univ}}/M\approx 8.314/0.0290\approx287\,\mathrm{J\,kg^{-1}K^{-1}}$ for dry air's mean molar mass $M\approx0.029\,\mathrm{kg\,mol^{-1}}$, and $c_v,c_p,u,h$ are likewise per kilogram. The dimensionless ratios $\gamma,\kappa,c_v/R$ are the same in either convention — they are pure functions of $f$.
