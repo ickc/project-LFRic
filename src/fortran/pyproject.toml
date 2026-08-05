@@ -60,7 +60,12 @@ cmd = "jupytext --sync index.ipynb"
 description = "Sync index.ipynb <-> _pair/index.py via jupytext"
 
 [tool.pixi.tasks.execute]
-cmd = "jupytext --sync index.ipynb && jupyter execute --kernel_name=python3 --inplace index.ipynb"
+cmd = """
+jupytext --sync index.ipynb
+  && jupyter execute --kernel_name=python3 --inplace index.ipynb
+  && python -m fortran_tour.nbclean index.ipynb
+  && jupytext --sync index.ipynb
+"""
 description = "Re-run the notebook in place, refreshing the stored outputs Quarto renders"
 
 [tool.pixi.tasks.demo]
@@ -73,10 +78,22 @@ description = "Remove demo/ build products"
 
 # Notebook <-> text pairing.
 #
-# The .ipynb is the file Quarto renders (it carries the stored outputs, so the
-# top-level `pixi run build` never needs a Fortran toolchain).  The paired .py
-# is the reviewable, diffable source.  It lives under `_pair/` because Quarto
-# skips any path component starting with `_`, so the pair is invisible to the
-# site build and cannot be mistaken for a second copy of the page.
+# The .ipynb is the file Quarto renders: it carries the stored outputs, so the
+# top-level `pixi run build` never needs a Fortran toolchain.  The paired .md
+# is the reviewable, diffable source, and the one to edit.
+#
+# Markdown rather than py:percent because the page is four-fifths prose, which
+# in py:percent would arrive as a thousand lines of `# ` comments.  Markdown
+# round-trips this document verbatim, fenced Fortran blocks inside markdown
+# cells included (md:myst does not -- it drops trailing newlines).
+#
+# `_pair/` because Quarto skips any path component starting with `_`, so the
+# pair stays out of the site build and cannot be mistaken for a second copy of
+# the page.
+#
+# `comment_magics = false` because otherwise jupytext escapes `%%fortran` to
+# `# %%fortran` on the way out, and the round trip back to .ipynb yields cells
+# that are Python syntax errors.
 [tool.jupytext]
-formats = "ipynb,_pair//py:percent"
+formats = "ipynb,_pair//md"
+comment_magics = false

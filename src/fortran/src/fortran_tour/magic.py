@@ -74,6 +74,22 @@ _PROCEDURE_START_RE = re.compile(
 )
 
 
+def _split_words(text: str) -> list[str]:
+    """Split a magic argument that holds a whole command line.
+
+    ``parse_argstring`` splits the magic's own line without honouring quotes,
+    so ``--flags "-O2 -fcheck=bounds"`` arrives with the quotation marks still
+    attached.  Handing that to ``shlex.split`` yields a *single* argument
+    containing a space, and gfortran then reads ``-O2 -fcheck=bounds`` as
+    ``-O`` with the argument ``2 -fcheck=bounds``.  Strip one layer of
+    matching quotes first.
+    """
+    text = text.strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+        text = text[1:-1]
+    return shlex.split(text)
+
+
 def _strip_comments(code: str) -> str:
     """Blank out ``!`` comments, respecting character literals.
 
@@ -221,7 +237,9 @@ class FortranMagics(Magics):
 
     @magic_arguments()
     @argument("-n", "--name", default=None, help="base name for the generated file")
-    @argument("-f", "--flags", default="", help="extra flags for the compiler")
+    # Quote the value: argparse reads a bare leading `-` as another option,
+    # so `--flags -O2` is an error while `--flags "-O2"` is not.
+    @argument("-f", "--flags", default="", help='extra compiler flags, quoted')
     @argument("--openmp", action="store_true", help="compile with -fopenmp")
     @argument("--no-run", action="store_true", help="compile but do not execute")
     @argument("--args", default="", help="command-line arguments for the program")
@@ -273,7 +291,7 @@ class FortranMagics(Magics):
         flags = list(DEFAULT_FLAGS)
         if args.openmp:
             flags.append("-fopenmp")
-        flags.extend(shlex.split(args.flags))
+        flags.extend(_split_words(args.flags))
 
         # -J is where .mod/.smod files are written, -I where they are found.
         # Both point at the build directory, which is also the cwd, so every
@@ -310,7 +328,7 @@ class FortranMagics(Magics):
             return
 
         try:
-            run = session.run(["./" + exe_name, *shlex.split(args.args)], timeout=120)
+            run = session.run(["./" + exe_name, *_split_words(args.args)], timeout=120)
         except subprocess.TimeoutExpired:
             print("timed out after 120 s", file=sys.stderr)
             return

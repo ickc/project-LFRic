@@ -28,6 +28,10 @@ website:
             text: "Paper, Explained"
           - href: formulation-explained.qmd
             text: "Formulation, from First Principles"
+      - text: Learn
+        menu:
+          - href: fortran/index.ipynb
+            text: "Modern Fortran, from the Ground Up"
       - href: glossary.qmd
         text: Glossary
 
