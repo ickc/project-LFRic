@@ -1,0 +1,13 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# scratch build tree used by the %%fortran magic
+.nbbuild/
+
+# demo/ build products
+demo/build/
+
+# jupyter
+.ipynb_checkpoints/
+.virtual_documents/
