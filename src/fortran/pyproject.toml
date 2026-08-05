@@ -45,27 +45,20 @@ lfortran = ">=0.60"
 
 [tool.pixi.tasks.lab]
 cmd = "jupyter lab"
-description = "Open JupyterLab (use the 'Python (fortran_tour)' kernel)"
+description = "Open JupyterLab in this environment; the notebook's python3 kernel is the right one"
 
+# Single-line commands on purpose: pixi's task shell treats a newline as a
+# command separator, so a TOML multi-line string silently splits into pieces.
 [tool.pixi.tasks.kernel]
-cmd = """
-python -m ipykernel install --user
-  --name fortran_tour
-  --display-name 'Python (fortran_tour)'
-"""
-description = "Register the notebook kernel with the user's Jupyter"
+cmd = "python -m ipykernel install --user --name fortran_tour --display-name 'Python (fortran_tour)'"
+description = "Register this environment as a kernel for a Jupyter installed elsewhere"
 
 [tool.pixi.tasks.sync]
 cmd = "jupytext --sync index.ipynb"
-description = "Sync index.ipynb <-> _pair/index.py via jupytext"
+description = "Reconcile index.ipynb <-> _pair/index.md via jupytext"
 
 [tool.pixi.tasks.execute]
-cmd = """
-jupytext --sync index.ipynb
-  && jupyter execute --kernel_name=python3 --inplace index.ipynb
-  && python -m fortran_tour.nbclean index.ipynb
-  && jupytext --sync index.ipynb
-"""
+cmd = "jupytext --sync index.ipynb && jupyter execute --kernel_name=python3 --inplace index.ipynb && python -m fortran_tour.nbclean index.ipynb && jupytext --sync index.ipynb"
 description = "Re-run the notebook in place, refreshing the stored outputs Quarto renders"
 
 [tool.pixi.tasks.demo]

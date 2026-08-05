@@ -1881,15 +1881,19 @@ Every generated PSy routine begins by calling `get_proxy` on each field, then wo
 
 ```python
 import subprocess
-print(subprocess.run(["make", "-C", "demo", "--no-print-directory"],
-                     capture_output=True, text=True).stdout)
-print(subprocess.run(["./demo/build/psykal_demo"],
-                     capture_output=True, text=True).stdout)
+
+def run(*argv):
+    print(subprocess.run(argv, capture_output=True, text=True).stdout)
+
+# From scratch, so the build order fortdep.py works out is visible: every
+# module before anything that `use`s it, and the two programs last.
+run("make", "-C", "demo", "--no-print-directory", "clean")
+run("make", "-C", "demo", "--no-print-directory")
+run("./demo/build/psykal_demo")
 ```
 
 ```python
-print(subprocess.run(["./demo/build/cli_demo", "--levels=70", "-v", "mesh_C48.nc"],
-                     capture_output=True, text=True).stdout)
+run("./demo/build/cli_demo", "--levels=70", "-v", "mesh_C48.nc")
 ```
 
 ### 10.6 The standards, distilled
