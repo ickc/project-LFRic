@@ -2,4 +2,3 @@
 **/*.quarto_ipynb
 docs/
 .pixi/
-*.lock
