@@ -12,11 +12,11 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.19.5
+      jupytext_version: 1.19.3
   kernelspec:
-    display_name: Python 3
+    display_name: Python (Pixi)
     language: python
-    name: python3
+    name: pixi-kernel-python3
 ---
 
 This is not a Fortran reference and not a "learn X in Y minutes". It is a rebuild of the language in dependency order, aimed at one job: **reading** the Fortran in [`lfric_core`](../lfric-core.qmd) and [`lfric_apps`](../lfric-apps.qmd) without friction, and writing enough of it to contribute. Every section either explains a mechanism or builds a bridge from something already familiar — NumPy, Numba, JAX, C, a little C++, a year of Julia.
