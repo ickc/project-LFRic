@@ -4,9 +4,10 @@ Why a magic rather than a Fortran Jupyter kernel?  LFortran ships one (``xeus``
 based, display name "Fortran") and it is pleasant for arithmetic, but as of
 0.64 it cannot compile ``use, intrinsic :: iso_fortran_env``, ``optional``
 dummy arguments, or ``allocate(p, source=...)`` on a polymorphic variable.
-Those three are load-bearing in LFRic, so the notebook drives a real compiler
-instead and keeps the Python kernel — which has the side benefit that a NumPy
-cell and a Fortran cell can sit next to each other.
+Those three are load-bearing in LFRic, so it is not installed here: the
+notebook drives a real compiler instead and keeps the Python kernel — which
+has the side benefit that a NumPy cell and a Fortran cell can sit next to each
+other.
 
 The model is a tiny build system, not a REPL:
 

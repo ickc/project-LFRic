@@ -14,19 +14,18 @@ fortran-highlight.lua  relabels %%fortran cells so Quarto highlights them
 ## Running it
 
 ```bash
-pixi run lab        # JupyterLab, using this environment's kernel
 pixi run execute    # re-run the notebook and refresh its stored outputs
 pixi run sync       # reconcile index.ipynb <-> _pair/index.md
 pixi run demo       # build demo/ programs
 pixi run demo-clean
 ```
 
-`pixi run lab` starts JupyterLab inside this environment, so the notebook's
-`python3` kernel is the right one and nothing needs registering. If you would
-rather open the notebook from a JupyterLab installed elsewhere, run
-`pixi run kernel` once: it registers this environment as **Python
-(fortran_tour)** under `~/.local/share/jupyter/kernels/`, and you then pick
-that kernel by hand.
+There is no JupyterLab in this environment. Open the notebook from a
+JupyterLab installed elsewhere that has [`pixi-kernel`](https://github.com/renan-r-santos/pixi-kernel)
+available: it discovers this directory's pixi project and launches the kernel
+inside this environment, which is why the notebook's recorded kernelspec is
+`pixi-kernel-python3`. `pixi run execute` needs no frontend at all — it drives
+the kernel headlessly through `nbclient`.
 
 ## Editing
 
@@ -43,10 +42,3 @@ the repository keeps working with nothing installed but Quarto.
 Drop a `.f90` into `demo/` and run `make -C demo`. The build order is worked
 out by `demo/fortdep.py`, so files can `use` each other in any arrangement.
 Every file containing a `program` becomes an executable in `demo/build/`.
-
-## About LFortran
-
-`lfortran` is in this environment but the notebook does not use it — §0 of the
-page explains why, and having it installed means you can check the claim. It
-is also useful on its own: `lfortran --show-asr file.f90` prints a resolved
-semantic tree, which settles arguments about what a declaration means.

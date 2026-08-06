@@ -49,7 +49,8 @@ quarto render src
 The Fortran tutorial page is its own pixi workspace inside the Quarto tree, because it needs a compiler and a notebook stack that the site build must not depend on.
 
 - `_pair/index.md` is the source to edit; `index.ipynb` is generated from it by jupytext and is **committed with its outputs**, because Quarto does not execute a notebook that already has them. So `pixi run build` at the repo root still needs nothing but Quarto.
-- `pixi run execute` (inside `src/fortran/`) re-runs the notebook, strips execution timestamps via `python -m fortran_tour.nbclean`, and syncs the pair back. Run it after editing `_pair/index.md`.
+- `pixi run execute` (inside `src/fortran/`) syncs the pair in, re-runs the notebook, strips execution timestamps via `python -m fortran_tour.nbclean`, and syncs back. Run it after editing `_pair/index.md`.
+- The environment holds no Jupyter frontend. The notebook is opened from a JupyterLab installed elsewhere via [`pixi-kernel`](https://github.com/renan-r-santos/pixi-kernel), hence the recorded kernelspec `pixi-kernel-python3`; `pixi run execute` overrides it with `python3`, which is what `ipykernel` registers inside the environment.
 - Fortran cells use a `%%fortran` magic (`src/fortran_tour/magic.py`) that drives gfortran — a small build system, not a REPL. LFortran's Jupyter kernel was evaluated and rejected; see §0 of the page.
 - `demo/` is a scratch build area with automatic module-dependency scanning (`fortdep.py`), plus a CLI example and a miniature PSyKAl stack.
 

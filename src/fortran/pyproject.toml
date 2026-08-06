@@ -21,44 +21,29 @@ fortran_tour = { path = ".", editable = true }
 # Toolchain: gfortran drives every `%%fortran` cell in the notebook.
 gfortran = ">=13"
 make = "*"
-# Notebook stack.
+# Notebook stack. No Jupyter *frontend* here: the notebook is opened from a
+# JupyterLab installed elsewhere, which reaches into this environment via
+# `pixi-kernel` -- so all that is needed on this side is `ipykernel` for the
+# kernel itself and `nbclient` for the headless re-run below.
 python = ">=3.11"
 ipykernel = ">=6.29"
-jupyterlab = ">=4.2"
 jupytext = ">=1.16"
 nbclient = ">=0.10"
 numpy = ">=2.0"
 
-# Optional: LFortran ships an `xeus` Jupyter kernel called "Fortran". It is not
-# what the notebook uses (see §0 for why), but it is here so the claims in §0
-# can be checked, and for `lfortran --show-asr`, which is a nice way to see how
-# a compiler resolves Fortran semantics. conda-forge has no linux-aarch64 build,
-# hence the per-platform scoping rather than a plain dependency.
-[tool.pixi.target.linux-64.dependencies]
-lfortran = ">=0.60"
-
-[tool.pixi.target.osx-64.dependencies]
-lfortran = ">=0.60"
-
-[tool.pixi.target.osx-arm64.dependencies]
-lfortran = ">=0.60"
-
-[tool.pixi.tasks.lab]
-cmd = "jupyter lab"
-description = "Open JupyterLab in this environment; the notebook's python3 kernel is the right one"
-
 # Single-line commands on purpose: pixi's task shell treats a newline as a
 # command separator, so a TOML multi-line string silently splits into pieces.
-[tool.pixi.tasks.kernel]
-cmd = "python -m ipykernel install --user --name fortran_tour --display-name 'Python (fortran_tour)'"
-description = "Register this environment as a kernel for a Jupyter installed elsewhere"
-
 [tool.pixi.tasks.sync]
 cmd = "jupytext --sync index.ipynb"
 description = "Reconcile index.ipynb <-> _pair/index.md via jupytext"
 
+# `--kernel_name=python3` overrides the notebook's recorded kernelspec, which
+# names `pixi-kernel-python3` -- a kernel that exists in the JupyterLab this
+# notebook is edited from, not in this environment. nbclient only ever reads
+# that field, so the override does not rewrite it.
 [tool.pixi.tasks.execute]
-cmd = "jupytext --sync index.ipynb && jupyter execute --kernel_name=python3 --inplace index.ipynb && python -m fortran_tour.nbclean index.ipynb && jupytext --sync index.ipynb"
+depends-on = ["sync"]
+cmd = "jupyter execute --kernel_name=python3 --inplace index.ipynb && python -m fortran_tour.nbclean index.ipynb && jupytext --sync index.ipynb"
 description = "Re-run the notebook in place, refreshing the stored outputs Quarto renders"
 
 [tool.pixi.tasks.demo]
