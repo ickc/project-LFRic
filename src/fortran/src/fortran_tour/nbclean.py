@@ -5,6 +5,13 @@ The notebook is committed — it is the file Quarto renders — so those timesta
 would show up as a diff on every re-run, and Quarto copies them into the HTML
 as ``data-quarto-private`` attributes.  Neither is wanted.
 
+The other churn is how a cell's stdout gets *split*.  A long-running cell —
+``!make -C demo``, say — writes in bursts, and how many ``stream`` outputs the
+kernel emits depends on whether those bursts landed inside the same flush
+interval.  The text is identical, the block structure is not, so an unchanged
+cell can still produce a diff.  Adjacent same-stream outputs are therefore
+merged into one, which is also how the notebook renders anyway.
+
 Usage::
 
     python -m fortran_tour.nbclean index.ipynb
@@ -21,6 +28,26 @@ from pathlib import Path
 VOLATILE = ("execution", "vscode", "collapsed", "scrolled")
 
 
+def coalesce(outputs: list[dict]) -> list[dict]:
+    """Merge runs of ``stream`` outputs sharing a ``name`` into single blocks."""
+    merged: list[dict] = []
+    for output in outputs:
+        previous = merged[-1] if merged else None
+        if (
+            previous is not None
+            and output.get("output_type") == "stream"
+            and previous.get("output_type") == "stream"
+            and output.get("name") == previous.get("name")
+        ):
+            # `text` is a list of lines, and a burst boundary can fall
+            # mid-line, so join the strings rather than the lists.
+            joined = "".join(previous["text"]) + "".join(output["text"])
+            previous["text"] = joined.splitlines(keepends=True)
+        else:
+            merged.append(output)
+    return merged
+
+
 def clean(path: Path) -> bool:
     """Rewrite *path* in place; return True if anything changed."""
     original = path.read_text()
@@ -34,6 +61,8 @@ def clean(path: Path) -> bool:
         # the In[n] ordering, but any output-level metadata is noise.
         for output in cell.get("outputs", []):
             output.get("metadata", {}).pop("execution", None)
+        if "outputs" in cell:
+            cell["outputs"] = coalesce(cell["outputs"])
 
     # `signature` and `widgets` are the other usual sources of churn.
     nb.get("metadata", {}).pop("widgets", None)
