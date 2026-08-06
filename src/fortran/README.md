@@ -9,6 +9,7 @@ _pair/index.md         the jupytext pair. Edit this, not the .ipynb
 src/fortran_tour/      the %%fortran cell magic that drives gfortran
 demo/                  multi-file examples + a scratch build area
 fortran-highlight.lua  relabels %%fortran cells so Quarto highlights them
+DESIGN.md              how the magic and the highlighting filter work
 ```
 
 ## Running it
