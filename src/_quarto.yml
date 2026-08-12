@@ -32,6 +32,8 @@ website:
         menu:
           - href: fortran/index.ipynb
             text: "Modern Fortran, from the Ground Up"
+          - href: psyclone/index.ipynb
+            text: "PSyclone, from the Ground Up"
       - href: glossary.qmd
         text: Glossary
 

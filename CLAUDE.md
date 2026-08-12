@@ -15,6 +15,7 @@ A Quarto website + submodule collection serving as a personal knowledge base aro
 | `submodules/lfric_apps` | `git@github.com:MetOffice/lfric_apps.git` | Science applications: Momentum® Atm model, GungHo dynamical core |
 | `submodules/LFRic-Atmosphere-Training` | `git@github.com:MetOffice/LFRic-Atmosphere-Training.git` | Self-learning training materials (Sphinx + Jupyter notebooks) |
 | `submodules/Isambard3-LFRic-Env-Science-Suites` | `git@github.com:UniExeterRSE/Isambard3-LFRic-Env-Science-Suites.git` | Spack environments (GNU/NVIDIA) + Rose/Cylc suites for Isambard3 HPC |
+| `submodules/PSyclone` | `git@github.com:stfc/PSyclone.git` | The source-to-source compiler; pinned to the release LFRic builds against (currently `v3.3.1`) |
 
 After cloning: `git submodule update --init --recursive`
 
@@ -53,6 +54,16 @@ The Fortran tutorial page is its own pixi workspace inside the Quarto tree, beca
 - The environment holds no Jupyter frontend. The notebook is opened from a JupyterLab installed elsewhere via [`pixi-kernel`](https://github.com/renan-r-santos/pixi-kernel), hence the recorded kernelspec `pixi-kernel-python3`; `pixi run execute` overrides it with `python3`, which is what `ipykernel` registers inside the environment.
 - Fortran cells use a `%%fortran` magic (`src/fortran_tour/magic.py`) that drives gfortran — a small build system, not a REPL. LFortran's Jupyter kernel was evaluated and rejected; see §0 of the page.
 - `demo/` is a scratch build area with automatic module-dependency scanning (`fortdep.py`), plus a CLI example and a miniature PSyKAl stack.
+
+### `src/psyclone/` — a second nested pixi project
+
+The PSyclone tutorial page, same arrangement as `src/fortran/` (edit `_pair/index.md`, `pixi run execute`, `.ipynb` committed with outputs) but no cell magic: PSyclone is a Python package, so the notebook drives it in-process.
+
+- `psyclone = "3.3.*"` is a deliberate pin, not a floor. The page runs LFRic's *real* optimisation scripts unmodified, and PSyclone's Python API moves between minor releases — 3.3 shifted `OMPParallelTrans` and renamed every `Dynamo0p3*Trans` to `LFRic*Trans`. Bump only when `lfric_apps` does, then re-run and re-read the diffs.
+- `src/psyclone_tour/` is presentation only: `show` emits Fortran as fenced markdown so Quarto highlights it, `tree` forces `Node.view(colour=False)`, `diff` shows what a transformation changed, `run` shells out for the CLI-only parts. See `DESIGN.md`.
+- The page processes real source from `submodules/{lfric_core,lfric_apps}`, so it depends on submodule state; `psyclone_tour.paths.check()` in the first cell fails loudly if they are absent.
+- `demo/` is a self-contained PSyKAl triplet (kernel, `.x90` algorithm, optimisation script). `GH_INC` on `W1` on purpose — a continuous function space is what makes colouring, the halo-depth loop bound and the `cmap` indirection appear. Nothing in it compiles; the artifact is the generated source.
+- PSyKAl-mode invocations must pass `--config submodules/lfric_core/etc/psyclone.cfg`. It is not decoration: `COMPUTE_ANNEXED_DOFS` in it changes the generated loop bounds.
 
 ## Key Institutional Context
 

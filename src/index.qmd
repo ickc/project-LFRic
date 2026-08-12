@@ -24,6 +24,14 @@ The architecture is based on:
 | [lfric_apps](submodules/lfric_apps/) | Science applications (Momentum® Atm) |
 | [LFRic-Atmosphere-Training](submodules/LFRic-Atmosphere-Training/) | Self-learning training materials |
 | [Isambard3-LFRic-Env-Science-Suites](submodules/Isambard3-LFRic-Env-Science-Suites/) | Spack envs + suites for Isambard3 HPC |
+| [PSyclone](submodules/PSyclone/) | The source-to-source compiler LFRic is built on |
+
+## Notes
+
+- [Modern Fortran, from the Ground Up](fortran/index.ipynb) — the language, rebuilt in dependency order for reading LFRic
+- [PSyclone, from the Ground Up](psyclone/index.ipynb) — PSyIR, the PSyKAl DSL, the "transmute" route, and PSyAD
+- [The Paper, Explained](paper-explained.qmd) — Adams et al. 2019, rebuilt from the ground up
+- [Formulation, from First Principles](formulation-explained.qmd)
 
 ## Key Links
 
