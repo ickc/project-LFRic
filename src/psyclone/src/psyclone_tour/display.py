@@ -60,11 +60,20 @@ def fortran(node: Node) -> str:
 
 
 def show(content: str | Path | Node, lang: str = "fortran") -> None:
-    """Display Fortran (or any other source) as a highlighted code block."""
+    """Display Fortran (or any other source) as a highlighted code block.
+
+    Accepts a PSyIR node, a path, or source text.  A single-line string
+    naming a file that exists is read as a path -- generated code is far
+    more often on disk than in a variable here, and the failure mode of
+    getting this wrong is silent: the page renders the *filename* as a
+    one-line code block and nobody notices.
+    """
     if isinstance(content, Node):
         text = fortran(content)
     elif isinstance(content, Path):
         text = content.read_text()
+    elif "\n" not in content and Path(content).is_file():
+        text = Path(content).read_text()
     else:
         text = content
     display(Markdown(f"```{lang}\n{text.rstrip()}\n```"))
