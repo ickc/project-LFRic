@@ -13,3 +13,6 @@
 [submodule "submodules/LFRic-Atmosphere-Training"]
 	path = submodules/LFRic-Atmosphere-Training
 	url = git@github.com:MetOffice/LFRic-Atmosphere-Training.git
+[submodule "submodules/PSyclone"]
+	path = submodules/PSyclone
+	url = git@github.com:stfc/PSyclone.git
