@@ -508,8 +508,10 @@ The ordering constraints between them are real, and `psyclone_tools.py` enforces
 A kernel's argument list is not free — it is dictated by the metadata, in a fixed order. Getting it wrong gives you a link error at best and silent garbage at worst, so PSyclone will print the interface the metadata implies:
 
 ```python
-run("psyclone-kern", "-gen", "stub", "-api", "lfric",
-    "demo/kernel/mini_matvec_kernel_mod.F90")
+stub = run("psyclone-kern", "-gen", "stub", "-api", "lfric",
+           "demo/kernel/mini_matvec_kernel_mod.F90", echo=False)
+
+show(stub.split("Kernel-stub code:", 1)[-1])  # drop psyclone-kern's own banner line
 ```
 
 Compare with the hand-written subroutine in the same file: same arguments, same order, same shapes. This is the first thing to run when a new kernel does not work, and the fastest way to learn the argument-order convention — `nlayers`, then field arrays in `meta_args` order, then per-function-space `ndf`, `undf`, `map`.

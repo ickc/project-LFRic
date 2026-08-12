@@ -119,8 +119,13 @@ def run(
     env: dict[str, str] | None = None,
     cwd: str | Path | None = None,
     expect_failure: bool = False,
+    echo: bool = True,
 ) -> str:
     """Run a command, print its combined output, and return it.
+
+    Pass ``echo=False`` when the caller wants to present the output itself --
+    ``show(run(..., echo=False))`` for a command that writes Fortran to
+    stdout, so it arrives highlighted instead of as grey stream text.
 
     Used for the parts of the page that must go through PSyclone's *command
     line* rather than its API -- the PSyKAl route, where ``psyclone -api
@@ -139,7 +144,8 @@ def run(
         cwd=None if cwd is None else str(cwd),
     )
     output = result.stdout + result.stderr
-    print(output.rstrip())
+    if echo:
+        print(output.rstrip())
     if result.returncode != 0 and not expect_failure:
         raise RuntimeError(
             f"command failed with exit code {result.returncode}: "
