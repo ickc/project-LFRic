@@ -1,0 +1,44 @@
+!-----------------------------------------------------------------------------
+! The algorithm layer: whole fields, no indices, no loops.
+!
+! The `.x90` extension is the marker.  This file is not compiled -- PSyclone
+! reads it, replaces each `invoke` with a call to a subroutine it generates,
+! and writes out a `.f90` that is.
+!-----------------------------------------------------------------------------
+module mini_alg_mod
+
+  use constants_mod,     only : r_def, i_def
+  use field_mod,         only : field_type
+  use function_space_mod, only : function_space_type
+  use mini_matvec_kernel_mod, only : mini_matvec_kernel_type
+
+  implicit none
+
+  private
+  public :: mini_alg
+
+contains
+
+  !> @brief Zero an accumulator, apply the kernel, then add the result on.
+  !> @param[in,out] lhs  W1 field accumulated into
+  !> @param[in]     rhs  W3 field read from
+  subroutine mini_alg(lhs, rhs)
+
+    implicit none
+
+    type(field_type), intent(inout) :: lhs
+    type(field_type), intent(in)    :: rhs
+
+    ! Two invokes, on purpose, and the difference between them is the point
+    ! of §"one invoke, or two" on the page: PSyclone can only fuse loops and
+    ! elide halo exchanges *within* one invoke. It cannot see across the
+    ! boundary between these two.
+    call invoke( name = "apply_mini_matvec",              &
+                 setval_c(lhs, 0.0_r_def),                &
+                 mini_matvec_kernel_type(lhs, rhs) )
+
+    call invoke( inc_a_times_X(2.0_r_def, lhs) )
+
+  end subroutine mini_alg
+
+end module mini_alg_mod
