@@ -1,0 +1,63 @@
+[project]
+authors = [{name = "Kolen Cheung", email = "10970208+ickc@users.noreply.github.com"}]
+dependencies = []
+description = "A tour of PSyclone for a Python/HPC programmer, aimed at optimising LFRic"
+name = "psyclone_tour"
+requires-python = ">= 3.11"
+version = "0.1.0"
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64"]
+
+[tool.pixi.pypi-dependencies]
+psyclone_tour = { path = ".", editable = true }
+
+[tool.pixi.dependencies]
+python = ">=3.11"
+# Pinned to a minor series, not left floating: the page prints PSyclone's
+# generated Fortran as committed notebook output, and a new minor release
+# reflows that output.  3.3 is what lfric_apps main now builds with
+# (`spack load py-psyclone@3.3.1` in the ESNZ cascade suite), so the real
+# optimisation scripts under lfric_core/lfric_apps run here unmodified.
+psyclone = "3.3.*"
+gfortran = ">=13"
+make = "*"
+ipykernel = ">=6.29"
+jupytext = ">=1.16"
+nbclient = ">=0.10"
+
+# Single-line commands on purpose: pixi's task shell treats a newline as a
+# command separator, so a TOML multi-line string silently splits into pieces.
+[tool.pixi.tasks.sync]
+cmd = "jupytext --sync index.ipynb"
+description = "Reconcile index.ipynb <-> _pair/index.md via jupytext"
+
+# `--kernel_name=python3` overrides the notebook's recorded kernelspec, which
+# names `pixi-kernel-python3` -- a kernel that exists in the JupyterLab this
+# notebook is edited from, not in this environment. nbclient only ever reads
+# that field, so the override does not rewrite it.
+[tool.pixi.tasks.execute]
+depends-on = ["sync"]
+cmd = "jupyter execute --kernel_name=python3 --inplace index.ipynb && python -m psyclone_tour.nbclean index.ipynb && jupytext --sync index.ipynb"
+description = "Re-run the notebook in place, refreshing the stored outputs Quarto renders"
+
+[tool.pixi.tasks.demo]
+cmd = "make -C demo"
+description = "Run PSyclone over the self-contained example in demo/"
+
+[tool.pixi.tasks.demo-clean]
+cmd = "make -C demo clean"
+description = "Remove demo/ generated code"
+
+# Notebook <-> text pairing, on the same terms as src/fortran: the .ipynb is
+# what Quarto renders and carries the committed outputs, the paired .md is
+# what to edit.  See src/fortran/pyproject.toml for why `_pair/` and why
+# markdown rather than py:percent.
+[tool.jupytext]
+formats = "ipynb,_pair//md"
+comment_magics = false

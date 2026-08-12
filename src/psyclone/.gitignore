@@ -1,0 +1,14 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# scratch area the notebook writes generated code into
+.nbbuild/
+
+# demo/ generated code: PSyclone writes the PSy layer and the transformed
+# algorithm next to the sources, and both are outputs, not sources
+demo/build/
+
+# jupyter
+.ipynb_checkpoints/
+.virtual_documents/
