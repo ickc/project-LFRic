@@ -18,6 +18,8 @@ website:
             text: LFRic Core
           - href: lfric-apps.qmd
             text: LFRic Apps
+          - href: ticket-813-openmp-scaling.qmd
+            text: "Ticket 813: OpenMP Scaling"
           - href: training.qmd
             text: Training
           - href: isambard.qmd

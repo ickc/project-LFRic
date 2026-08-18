@@ -1,0 +1,311 @@
+---
+title: "Ticket 813: Why More OpenMP Threads Lose Efficiency"
+author: "OpenAI Codex"
+date: 2026-08-18
+description: "A source-based explanation of the hybrid MPI/OpenMP results for Spectral Gravity Wave Drag"
+---
+
+## The short answer
+
+Ticket 813 does not show that OpenMP stops working at two threads. It shows two
+different effects that are easy to conflate:
+
+1. The ticket's percentage-difference plot compares the **new code with the old
+   code at the same rank/thread configuration**. Its peak at two threads says
+   where this particular, incremental transformation helps most. It is not an
+   OpenMP speed-up curve.
+2. The absolute timings do show that the hybrid configurations become less
+   efficient as threads replace MPI ranks. The source explains why: only part
+   of the timed algorithm is threaded, its main core has vertical dependencies,
+   and the generated code introduces repeated worksharing barriers. The serial
+   work done by each rank grows when there are fewer, larger MPI subdomains.
+
+The usual “one MPI rank per socket, threads across the socket” heuristic assumes
+that nearly all important work inside each rank scales well with threads and is
+NUMA-local. Neither assumption holds here.
+
+::: {.callout-important}
+The strongest source-level explanation is the unthreaded packing and unpacking
+around `gw_ussp`. At fixed total workers, replacing $T$ MPI ranks by one
+$T$-thread rank gives that rank roughly $T$ times as many horizontal cells.
+The serial wrapper therefore takes roughly $T$ times as much work per rank,
+while only the middle of the calculation can recover that factor with OpenMP.
+:::
+
+## Read the ticket's graph carefully
+
+The production-flags chart in the
+[Ticket Details](https://code.metoffice.gov.uk/trac/lfric_apps/wiki/ticket/813/TicketDetails)
+plots approximately
+
+$$
+100\frac{t_{\mathrm{baseline}}(M,T)-t_{\mathrm{ticket}}(M,T)}
+         {t_{\mathrm{baseline}}(M,T)}
+$$
+
+for $384×1$, $192×2$, $96×4$, and $48×8$, always
+using three nodes. The bars are about 0%, 3.9%, 2.1%, and 1.7% respectively.
+They answer “how much did ticket 813 improve this configuration?”, not “how
+quickly does OpenMP execute the fixed problem?”
+
+The distinction matters. A two-thread bar can be the tallest even while the
+one-thread, 384-rank configuration has the shortest absolute time.
+
+### What the absolute data say
+
+One production-flags series in the ticket's
+[`omp_block`-removed raw attachment](https://code.metoffice.gov.uk/trac/lfric_apps/attachment/wiki/ticket/813/TicketDetails/raw_cce_Block_Removed.md)
+uses `ussp_segment=32`. Its recorded `spectral_gwd_alg` mean times are:
+
+| MPI ranks | OMP threads | Rank × thread | Mean time (s) | Relative time | Hybrid efficiency[^eff] |
+|---:|---:|---:|---:|---:|---:|
+| 384 | 1 | 384 | 0.31 | 1.00× | 100% |
+| 192 | 2 | 384 | 0.38 | 1.23× | 82% |
+| 96 | 4 | 384 | 0.57 | 1.84× | 54% |
+| 48 | 8 | 384 | 1.23 | 3.97× | 25% |
+
+Perfect hybrid scaling would make this table approximately flat: each rank
+would receive $T$ times the local work and its $T$ threads would finish it
+in the original time. Instead, two threads recover most—but not all—of that
+factor, while four and eight recover progressively less.
+
+These are individual ticket measurements, so their exact ratios should not be
+overinterpreted. The direction is corroborated by the internal EX review: the
+pre-change mean time in `gw_ussp_mod` rose from 0.87 s at one thread to 0.91 s
+at two and 1.04 s at four. The
+[Sci/Tech Review](https://code.metoffice.gov.uk/trac/lfric_apps/wiki/ticket/813/SciTechReview)
+describes the before/after change itself as negligible on CCE 15.
+
+[^eff]: Here “hybrid efficiency” is $t_1/t_T$. This follows from comparing a
+    rank with $T$ times the one-thread local workload: speed-up is
+    $Tt_1/t_T$, so efficiency is $(Tt_1/t_T)/T=t_1/t_T$.
+
+## What is actually being timed
+
+The relevant code is best read at the
+[ticket merge commit](https://github.com/MetOffice/lfric_apps/commit/db82bec425dc45f757e5a575340225d7741e0d6a),
+because the current source has since evolved.
+
+```{mermaid}
+flowchart TD
+    A["spectral_gwd_alg timer starts"] --> B["Serial LFRic setup and DOMAIN-kernel packing"]
+    B --> C["gw_ussp: selected loops and segments use OpenMP"]
+    C --> D["Serial unpacking and remaining built-in work"]
+    D --> E["spectral_gwd_alg timer stops"]
+```
+
+The timer surrounds the whole algorithm, from lines 91 to 149 of
+[`spectral_gwd_alg_mod.x90`](https://github.com/MetOffice/lfric_apps/blob/db82bec425dc45f757e5a575340225d7741e0d6a/interfaces/physics_schemes_interface/source/algorithm/spectral_gwd_alg_mod.x90#L91).
+The science kernel declares `operates_on = DOMAIN`, so it is called once for
+the MPI rank's local domain rather than once per cell.
+
+Inside
+[`spectral_gwd_kernel_mod.F90`](https://github.com/MetOffice/lfric_apps/blob/db82bec425dc45f757e5a575340225d7741e0d6a/interfaces/physics_schemes_interface/source/kernel/spectral_gwd_kernel_mod.F90#L141),
+substantial loops execute before `gw_ussp` is called:
+
+- local arrays of shape `(seg_len, 1, nlayers)` are initialised;
+- LFRic fields are gathered through dofmaps and converted into those arrays;
+- diagnostic arrays are allocated.
+
+After the call, further loops scatter increments and diagnostics back into
+LFRic fields. Ticket 813 transforms `gw_ussp_mod.F90`; it does not thread this
+surrounding pack/unpack code.
+
+This gives a useful model for the fixed-resource experiment. Let $S$ be the
+unthreaded per-cell wrapper work assigned to one rank in the one-thread case,
+$P$ the threadable work, and $O(T)$ the OpenMP overhead. As the rank count is
+divided by $T$, a rank's local domain grows by about $T$:
+
+$$
+t_T \approx T S + \frac{T P}{T E(T)} + O(T) + H(M),
+$$
+
+where $E(T)$ is the efficiency of the threaded portion and $H(M)$ is any
+MPI/halo cost visible to this timer. Even if $E(T)=1$, the $TS$ term grows.
+In this code $E(T)$ also falls, for the reasons below.
+
+## Why the OpenMP portion is not ideally scalable
+
+### The hot core has a real vertical dependency
+
+The deepest Spectral GWD calculation is called once for each horizontal
+segment. In
+[`gw_ussp_core_mod.F90`](https://github.com/MetOffice/lfric_apps/blob/db82bec425dc45f757e5a575340225d7741e0d6a/science/physics_schemes/source/gravity_wave_drag/gw_ussp_core_mod.F90#L442),
+the loop nest is broadly `direction → level → point`, and the flux at level
+`k` reads the result at `k-1`. The expensive propagation through a column
+therefore cannot simply distribute its levels among independent threads.
+
+The implementation instead partitions horizontal points into segments and
+uses a dynamically scheduled OpenMP loop over those segments. That exposes
+parallel work, but it is not free:
+
+- every segment allocates six temporary arrays;
+- data are packed into the segment, the serial/vectorised core is called, and
+  results are unpacked;
+- all six arrays are then deallocated;
+- dynamic scheduling is used because branches and iterative work make segment
+  costs variable.
+
+With more threads in one rank, the runtime, memory allocator, cache hierarchy,
+and memory channels are shared by more concurrent segment tasks. Dynamic
+scheduling mitigates load imbalance but adds scheduling and allocator
+contention. The ticket's segment-size sweep choosing 32 is evidence that this
+granularity matters.
+
+### Some worksharing barriers occur once per level
+
+The final transformed Fortran attached to the ticket contains the shape:
+
+```fortran
+do k = tdims%k_end, tkfix1start + 1, -1
+  !$omp do schedule(static)
+  do i = tdims%i_start, tdims%i_end
+    ...
+  end do
+  !$omp end do
+end do
+```
+
+`!$omp end do` has an implicit barrier because there is no `nowait`. Every
+thread therefore enters a new workshare and rendezvous for every vertical
+level. Similar workshares occur inside the small azimuthal-direction loop.
+The useful per-thread work is modest, while barrier cost and load imbalance
+rise with the team size. Two threads can still amortise this; four and eight
+have progressively more waiting.
+
+There are also five distinct parallel constructs in the final generated
+routine: a clustered parallel region, the dynamic segment `parallel do`, a
+second clustered region, and two standalone `parallel do` regions. Thread
+teams may be retained by the runtime, but entering workshares and regions is
+not zero-cost. The Ticket Details explicitly records that lighter loops were
+left serial because their work could not amortise this overhead.
+
+### The ticket parallelises loops, not the whole call path
+
+The transformation selects loops by the arrays they write. It applies static
+worksharing to “heavy” `k` or `i` loops and clusters adjacent loops into
+parallel regions; it does not recursively make every called routine or every
+line parallel. The final code still contains serial setup, small boundary
+loops, allocations, diagnostics, and the kernel wrapper described above.
+
+This is why a low thread count is sufficient to expose the limit. Thread count
+does not need to be “high” in an absolute sense: it only needs to be high
+relative to the amount of parallel work between two synchronisation points.
+
+### Memory layout favours vectorisation, but the conversion costs bandwidth
+
+The native LFRic field is accessed through expressions such as
+`map_w3(1,i) + k - 1`, so values down a column are contiguous there. Before
+entering `gw_ussp`, however, the domain kernel repacks fields into Fortran
+arrays declared `(seg_len, 1, nlayers)`. In these working arrays the **first**
+index—horizontal point `i`—is contiguous, not level `k`.
+
+That is sensible for the many `k → i` loops: the compiler can vectorise the
+inner horizontal loop. It also means the timed algorithm pays for a layout
+conversion, and many of the newly threaded loops are streaming operations
+such as zeroing, copying, and simple array arithmetic. Once the node's memory
+bandwidth or a shared cache is busy, extra OpenMP threads add little throughput.
+MPI ranks already using all cores can reach the same bandwidth ceiling.
+
+First-touch placement and thread binding can further matter. A rule such as
+one rank per socket is only helpful if pages are placed across the socket's
+NUMA domains and threads stay close to their data. The ticket contains no
+NUMA, binding, or hardware-counter evidence, so this is a plausible secondary
+factor rather than the primary conclusion.
+
+### CCE did not like the larger collapsed iteration space
+
+Combining `k`, `j`, and `i` with `collapse` might seem like the obvious way to
+give a larger iteration space to four or eight threads. Here `j` is always one
+in LFRic, and ticket testing found that collapse was compiler-sensitive:
+GCC benefited, while CCE 15 performed best with no collapse. The final script
+therefore uses static scheduling without collapse for CCE.
+
+This preserves the compiler's preferred vector loop and avoids a measured CCE
+regression, but it leaves OpenMP with the smaller outer-loop iteration space.
+It is a deliberate trade-off, not evidence that PSyclone can automatically
+find a universally scalable schedule.
+
+## Why fewer MPI ranks do not automatically win here
+
+Fewer MPI ranks do normally reduce halo surface area, duplicated halo storage,
+and message count. That benefit is real, but it competes with costs rather than
+replacing them:
+
+- `gw_ussp_mod` itself contains no MPI or halo exchange. It works on arrays
+  already local to a rank, so most of the ticket's transformed region cannot
+  directly profit from having fewer MPI neighbours.
+- Fewer ranks make `seg_len` larger. All serial packing, allocation, conversion,
+  and unpacking within each rank grow with it.
+- Halo savings concern boundary data; the science computation still has to be
+  performed for essentially every owned column.
+- The measurement is a component timer. Even if fewer ranks improve MPI-heavy
+  parts elsewhere in the model, that gain need not appear in this curve.
+- A rank per socket is not a universal optimum. On a multi-domain socket, one
+  rank per NUMA domain is often a more useful starting point when first-touch
+  and memory bandwidth dominate.
+
+The empirical result says that, for this C192 component on these systems, the
+saved rank-level overhead is smaller than the growing serial and OpenMP costs.
+There is no contradiction with the usual hybrid-MPI argument; its assumptions
+simply do not describe this routine.
+
+## Why ticket 813 gains only a few percent
+
+Ticket 813 is an incremental replacement of existing OpenMP, not the conversion
+of a large serial hotspot. The ticket records two deliberately small changes:
+
+- removing the old `omp_block` wrapper was about 0.5% faster on average, with a
+  largest observed gain of 1.63%;
+- extending OpenMP coverage to the final increment loop contributed about
+  0.17%.
+
+The baseline already had OpenMP around the major regions. The new script mainly
+changes region grouping, scheduling, coverage of selected loops, and the
+unhelpful manual blocking. It cannot speed up the serial wrapper or the
+dependency-constrained vertical core. A few percent is therefore the expected
+scale of the opportunity.
+
+There is another denominator to keep straight. The correctness table reports
+`spectral_gwd_alg` as only roughly 0.1–0.5% of the measured application time in
+those runs. A 4% improvement to a 0.3% component is only about 0.012% of the
+whole run under a simple Amdahl estimate. A 20% whole-component gain seen in a
+different case likely involved a larger previously serial fraction, a more
+compute-bound loop, or a transformation covering the pack/unpack path as well.
+
+## The most useful follow-up measurements
+
+No compilation or profiler was available for this analysis, so the ordering
+below is designed to distinguish the source-backed explanation from the
+secondary hardware hypotheses:
+
+1. Plot **absolute time**, not only baseline-versus-ticket percentage, for every
+   $M×T$ combination. Use maximum-rank time as well as the mean.
+2. Add nested timers for field packing, `gw_ussp` setup, the dynamic segment
+   loop, post-core loops, and field unpacking. The serial sandwich should become
+   visible immediately.
+3. Run a separate fixed-rank thread-scaling experiment. The existing fixed-core
+   experiment changes MPI decomposition and OpenMP team size at the same time.
+4. Record `meta_segments%num_segments` per rank and the distribution of segment
+   time per thread. This tests granularity and imbalance directly.
+5. Measure barrier time, allocator contention, memory bandwidth, cache misses,
+   and remote-NUMA traffic. Repeat with explicit `OMP_PLACES=cores` and
+   `OMP_PROC_BIND=close`/`spread`, and compare ranks per NUMA domain with ranks
+   per socket.
+6. Prototype parallel packing/unpacking and reusable per-thread segment buffers.
+   Those changes attack the scaling limit; adding directives to more tiny loops
+   probably does not.
+7. Re-test collapsed schedules by compiler. The ticket already demonstrates
+   that a schedule which helps GCC can hurt CCE.
+
+The practical conclusion is to treat two threads as a good empirical operating
+point for this ticket and machine/compiler combination—not as a general LFRic
+limit. The source predicts exactly this kind of early plateau, and it also shows
+where a future optimisation would have to work to move it.
+
+## Sources
+
+- [Ticket 813](https://code.metoffice.gov.uk/trac/lfric_apps/ticket/813)
+- [Ticket details, raw results, and final transformed Fortran](https://code.metoffice.gov.uk/trac/lfric_apps/wiki/ticket/813/TicketDetails)
+- [Ticket 813 Sci/Tech review](https://code.metoffice.gov.uk/trac/lfric_apps/wiki/ticket/813/SciTechReview)
+- [Merged implementation](https://github.com/MetOffice/lfric_apps/commit/db82bec425dc45f757e5a575340225d7741e0d6a)
