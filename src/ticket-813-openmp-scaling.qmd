@@ -1,8 +1,8 @@
 ---
-title: "Ticket 813: Why More OpenMP Threads Lose Efficiency"
+title: "PSyclone: Understanding Hybrid MPI/OpenMP Scaling Through Ticket 813"
 author: "OpenAI Codex"
 date: 2026-08-18
-description: "A source-based explanation of the hybrid MPI/OpenMP results for Spectral Gravity Wave Drag"
+description: "What Ticket 813 teaches us about PSyclone, generated OpenMP, and hybrid MPI/OpenMP scaling"
 ---
 
 ## The short answer
@@ -22,15 +22,31 @@ different effects that are easy to conflate:
 
 The usual “one MPI rank per socket, threads across the socket” heuristic assumes
 that nearly all important work inside each rank scales well with threads and is
-NUMA-local. Neither assumption holds here.
+NUMA-local. Neither assumption is established here. In particular, the code has
+two layout-conversion layers which must not be conflated:
+
+1. The outer LFRic-domain wrapper gathers native fields into rank-sized science
+   arrays before `gw_ussp`, and scatters results back afterwards. Those loops are
+   serial in this version and outside Ticket 813's transformation target.
+2. `gw_ussp` then copies one horizontal segment into smaller core arrays, calls
+   `gw_ussp_core`, and copies the result back. This second conversion is inside a
+   dynamically scheduled OpenMP loop, so different segments run concurrently.
 
 ::: {.callout-important}
-The strongest source-level explanation is the unthreaded packing and unpacking
-around `gw_ussp`. At fixed total workers, replacing $T$ MPI ranks by one
-$T$-thread rank gives that rank roughly $T$ times as many horizontal cells.
+The strongest source-level explanation is the unthreaded **outer** packing and
+unpacking around `gw_ussp`, together with serial setup and fine-grained
+synchronisation inside it. At fixed total workers, replacing $T$ MPI ranks by
+one $T$-thread rank gives that rank roughly $T$ times as many horizontal cells.
 The serial wrapper therefore takes roughly $T$ times as much work per rank,
 while only the middle of the calculation can recover that factor with OpenMP.
+The outer loops are not inherently serial; they simply were not transformed by
+this ticket. Parallelising them would be a separate, wider change.
 :::
+
+No nested timer in the ticket proves that this outer layer is the single
+largest cost. It is the strongest source-backed scaling explanation and a
+specific hypothesis for profiling, not a measured attribution of every lost
+percentage point.
 
 ## Read the ticket's graph carefully
 
@@ -80,6 +96,56 @@ describes the before/after change itself as negligible on CCE 15.
     rank with $T$ times the one-thread local workload: speed-up is
     $Tt_1/t_T$, so efficiency is $(Tt_1/t_T)/T=t_1/t_T$.
 
+## The benchmark machines and their caches
+
+The detailed $384×1$ through $48×8$ sweep in the Ticket Details used three
+ARCHER2 nodes and CCE. The
+[ARCHER2 hardware guide](https://docs.archer2.ac.uk/user-guide/hardware/)
+specifies two 64-core AMD EPYC 7742 “Rome” processors per node: 128 physical
+cores, 512 KiB of private L2 per core, and 16 MiB of L3 for each four-core Core
+Complex (CCX). The
+[AMD product specification](https://www.amd.com/en/support/downloads/drivers.html/processors/epyc/epyc-7002-series/amd-epyc-7742.html)
+gives 256 MiB of L3 per socket, hence 512 MiB per node, but AMD's
+[Rome HPC guide](https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/tuning-guides/amd-epyc-7002-tg-hpc-56827.pdf)
+shows that it is physically partitioned into 16 MiB CCX slices rather than one
+uniform socket-wide pool. ARCHER2 also configures eight 16-core NUMA regions
+per node.
+
+At full occupation, the cache accounting for the ticket's sweep is:
+
+| Configuration | Ranks/node | Ideal compact placement around one 4-core CCX | Average L3/rank | Average L3/thread |
+|---|---:|---|---:|---:|
+| 384 × 1 | 128 | Four ranks share one CCX | 4 MiB | 4 MiB |
+| 192 × 2 | 64 | Two ranks share one CCX | 8 MiB | 4 MiB |
+| 96 × 4 | 32 | One rank occupies one CCX | 16 MiB | 4 MiB |
+| 48 × 8 | 16 | One rank spans two CCXs | 32 MiB | 4 MiB |
+
+This validates the “L3 per MPI process” bookkeeping but also shows why it does
+not predict a win: when the thread count per rank grows by $T$, both the
+rank-local work and its average L3 allowance grow by about $T$. L3 per worker
+remains 4 MiB, and every worker still has a private 512 KiB L2. The hardware
+does not reserve an L3 quota for a process; cache lines from ranks and threads
+sharing a CCX evict one another in the same physical cache.
+
+Four threads is actually the neatest Rome placement—one rank and four threads
+per CCX. At eight threads a rank spans two separate L3 slices, although eight
+compact cores still fit within one ARCHER2 16-core NUMA region. Placement and
+first-touch can therefore influence the result, but there is no L3-capacity
+cliff at two threads.
+
+The separate Sci/Tech review used three Met Office EX nodes, CCE 15, and one,
+two, or four threads. Its page does not identify the CPU SKU. The available
+platform
+[configuration](https://github.com/MetOffice/lfric_apps/blob/a93bed8e145ff637282ae37cc04f4e5d5c4deeab/rose-stem/site/meto/variables.cylc#L82-L90)
+describes the default EX1A node as 128-core AMD Milan, while its
+[launch macros](https://github.com/MetOffice/lfric_apps/blob/a93bed8e145ff637282ae37cc04f4e5d5c4deeab/rose-stem/site/meto/macros/macros_ex1a.cylc#L7-L10)
+specify two sockets per node. AMD's
+[Milan HPC guide](https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/tuning-guides/high-performance-computing-tuning-guide-amd-epyc7003-series-processors.pdf)
+specifies 512 KiB private L2 per core and a base 32 MiB L3 shared by up to
+eight cores. The exact model—and whether it had standard or 3D V-Cache L3—was
+not available, but the working block discussed below fits in L2 in either
+case.
+
 ## What is actually being timed
 
 The relevant code is best read at the
@@ -88,16 +154,22 @@ because the current source has since evolved.
 
 ```{mermaid}
 flowchart TD
-    A["spectral_gwd_alg timer starts"] --> B["Serial LFRic setup and DOMAIN-kernel packing"]
-    B --> C["gw_ussp: selected loops and segments use OpenMP"]
-    C --> D["Serial unpacking and remaining built-in work"]
-    D --> E["spectral_gwd_alg timer stops"]
+    A["spectral_gwd_alg timer starts"] --> B["Layer 1: serial LFRic fields → rank-domain science arrays"]
+    B --> C["gw_ussp setup and selected OpenMP workshares"]
+    C --> D["Layer 2: dynamic OpenMP loop over horizontal segments"]
+    D --> E["For each segment: pack → vertical core → unpack"]
+    E --> F["Remaining gw_ussp workshares"]
+    F --> G["Layer 1 reverse: serial science arrays → LFRic fields"]
+    G --> H["spectral_gwd_alg timer stops"]
 ```
 
 The timer surrounds the whole algorithm, from lines 91 to 149 of
 [`spectral_gwd_alg_mod.x90`](https://github.com/MetOffice/lfric_apps/blob/db82bec425dc45f757e5a575340225d7741e0d6a/interfaces/physics_schemes_interface/source/algorithm/spectral_gwd_alg_mod.x90#L91).
 The science kernel declares `operates_on = DOMAIN`, so it is called once for
-the MPI rank's local domain rather than once per cell.
+the MPI rank's local domain rather than once per cell. That rank-sized call
+contains two different conversions.
+
+### Layer 1: LFRic fields to rank-domain science arrays
 
 Inside
 [`spectral_gwd_kernel_mod.F90`](https://github.com/MetOffice/lfric_apps/blob/db82bec425dc45f757e5a575340225d7741e0d6a/interfaces/physics_schemes_interface/source/kernel/spectral_gwd_kernel_mod.F90#L141),
@@ -110,6 +182,48 @@ substantial loops execute before `gw_ussp` is called:
 After the call, further loops scatter increments and diagnostics back into
 LFRic fields. Ticket 813 transforms `gw_ussp_mod.F90`; it does not thread this
 surrounding pack/unpack code.
+
+This first conversion is approximately transpose-like, although it is not a
+single matrix transpose instruction. A native field is addressed through a
+dofmap such as `map_w3(1,i) + k - 1`; values down one vertical column are
+contiguous in that one-dimensional LFRic storage. The wrapper gathers them
+into arrays declared `(seg_len, 1, nlayers)`. Because Fortran's first index is
+contiguous, adjacent horizontal points `i` are contiguous in the science
+arrays. The conversion therefore changes the convenient traversal from
+vertical-within-a-column to horizontal-within-a-level, while also applying
+precision conversions and deriving quantities such as pressure and radius.
+
+The resulting layout suits the later `k → i` nests: each level exposes a
+contiguous horizontal vector for SIMD. The cost is a complete gather before
+the science routine and a scatter afterwards.
+
+Nothing in the mathematics requires these outer loops to be serial. They are
+serial here because the ticket's PSyclone script targets `gw_ussp_mod.F90`, not
+the surrounding DOMAIN kernel. Extending coverage would be a separate change:
+the dofmap gathers, derived quantities, conditional diagnostic allocation,
+output scatters, data-sharing clauses, and first-touch placement would all
+need to be transformed and tested. That is broader than adding one directive
+to the core, but it is a plausible future optimisation.
+
+### Layer 2: rank-domain arrays to one horizontal segment
+
+Inside `gw_ussp`, the code constructs a list of horizontal segments. Its
+OpenMP `do schedule(dynamic)` assigns whole segments to threads. For each
+assigned segment, that thread:
+
+1. allocates six compact `s_*` arrays;
+2. copies the segment's horizontal points at **all** applicable vertical
+   levels into them, including a precision conversion;
+3. calls `gw_ussp_core`;
+4. copies the calculated flux back to the rank-domain array; and
+5. deallocates the six arrays.
+
+This second pack/core/unpack sequence is sequential within one segment, but
+segments execute concurrently on different OpenMP threads. It is therefore
+parallel overhead and a source of tail imbalance, allocation contention, and
+bandwidth demand—not the main serial fraction described by $S$ below. The
+small serial part at this layer is the construction of segment metadata before
+the OpenMP region.
 
 This gives a useful model for the fixed-resource experiment. Let $S$ be the
 unthreaded per-cell wrapper work assigned to one rank in the one-thread case,
@@ -124,6 +238,13 @@ where $E(T)$ is the efficiency of the threaded portion and $H(M)$ is any
 MPI/halo cost visible to this timer. Even if $E(T)=1$, the $TS$ term grows.
 In this code $E(T)$ also falls, for the reasons below.
 
+Strictly, $TS$ is not “OpenMP overhead”; it is useful work left outside the
+parallel coverage, so Amdahl's law exposes it as ranks become larger. The
+parallel-implementation overhead $O(T)$ consists of OpenMP region/workshare
+entry, barriers, dynamic scheduling, and waiting for the slowest thread, plus
+strategy-specific costs such as per-segment allocation. Both effects make the
+hybrid curve worse, but they have different remedies.
+
 ## Why the OpenMP portion is not ideally scalable
 
 ### The hot core has a real vertical dependency
@@ -135,9 +256,83 @@ the loop nest is broadly `direction → level → point`, and the flux at level
 `k` reads the result at `k-1`. The expensive propagation through a column
 therefore cannot simply distribute its levels among independent threads.
 
-The implementation instead partitions horizontal points into segments and
-uses a dynamically scheduled OpenMP loop over those segments. That exposes
-parallel work, but it is not free:
+The horizontal `point` iterations at a given level are independent and
+contiguous, so the compiler can vectorise them. The outer level loop must
+advance in order. Parallelism is consequently exposed across **columns**, not
+by assigning different heights of the same column to different threads. A
+segment of 32 means up to 32 consecutive horizontal points, each carrying its
+whole vertical extent; it does not mean 32 pieces of one vertical column.
+
+This differs from three-dimensional matrix tiling. One could in principle
+process a small slab of levels at a time, but the next slab would still need
+the final flux from the preceding one. Such vertical tiling might change cache
+behaviour, but it would not make the slabs independent and it is not what
+`segments_mod` implements.
+
+### Why the horizontal segments exist
+
+The implementation partitions the rank's horizontal points and dynamically
+schedules those segments. This serves three related purposes:
+
+- it gives OpenMP more independent tasks than there are threads, allowing a
+  thread that finishes an inexpensive segment to take another;
+- it keeps the inner horizontal dimension long enough for useful SIMD; and
+- it bounds the per-thread temporary working set so that the active core data
+  can remain near the core.
+
+The first purpose matters because the work per column is data-dependent. The
+core contains branches and bounded Newton–Raphson searches, so equal numbers
+of columns need not take equal time. The final partial segment can also be
+shorter. Dynamic scheduling addresses that variation, although it adds a
+scheduler operation for every segment.
+
+If all columns had identical, known cost, over-decomposition into many small
+segments would not be needed for load balance: one sufficiently large
+horizontal block per thread could suffice. Some partitioning would still be
+needed to give different threads independent columns, and a finite block
+would remain useful for cache locality and vectorisation. Thus “perfect
+balance means no segmentation” is true only in the narrower sense that the
+extra dynamic chunks could disappear—not that the whole rank-sized domain is
+necessarily the best core working set.
+
+### Why 32 is plausibly an L2-sized sweet spot
+
+For $P$ horizontal points, about $K$ active levels, four directions, and
+eight-byte reals, the six allocated segment arrays alone occupy approximately
+
+$$
+8P\left(2+2K+2K\times4\right)\ \text{bytes}.
+$$
+
+With $P=32$ and $K\approx80$, that is about 205,000 bytes, or 200 KiB, per
+active thread. `gw_ussp_core` adds vector temporaries and level-dependent
+arrays, so the true working set is somewhat larger, but it still plausibly
+fits by capacity in an ARCHER2 core's 512 KiB private L2. The scaling with
+segment size is instructive:
+
+| Segment size | Six main arrays | Likely cache regime on EPYC 7742 |
+|---:|---:|---|
+| 32 | ≈200 KiB | Fits in private 512 KiB L2, with room for some temporaries |
+| 64 | ≈400 KiB | Marginal once core temporaries and other cache lines are included |
+| 128 | ≈800 KiB | Exceeds L2 and relies on the shared L3 |
+
+This does not prove that `ussp_segment=32` was analytically chosen from the L2
+size—the ticket chose it empirically—but it gives the observed optimum a
+credible hardware interpretation. It looks more like L2 blocking per worker
+than an L3 allowance per MPI process.
+
+Both extremes have costs:
+
+- Too small: more dynamic-scheduler visits, allocations, deallocations, core
+  calls, copy-loop setup, short SIMD loops, and bookkeeping per useful column.
+- Too large: fewer tasks for balancing variable column costs, longer tail
+  stragglers, and a working set that approaches or exceeds L2.
+
+This is why the best segment size can lie near—but below—the L2 capacity. It is
+an empirical compromise among locality, SIMD efficiency, task overhead, and
+load balance rather than a pure cache-size formula.
+
+Even at the chosen size, the mechanism is not free:
 
 - every segment allocates six temporary arrays;
 - data are packed into the segment, the serial/vectorised core is called, and
@@ -192,20 +387,15 @@ This is why a low thread count is sufficient to expose the limit. Thread count
 does not need to be “high” in an absolute sense: it only needs to be high
 relative to the amount of parallel work between two synchronisation points.
 
-### Memory layout favours vectorisation, but the conversion costs bandwidth
+### Layout conversion and simple loops consume bandwidth
 
-The native LFRic field is accessed through expressions such as
-`map_w3(1,i) + k - 1`, so values down a column are contiguous there. Before
-entering `gw_ussp`, however, the domain kernel repacks fields into Fortran
-arrays declared `(seg_len, 1, nlayers)`. In these working arrays the **first**
-index—horizontal point `i`—is contiguous, not level `k`.
-
-That is sensible for the many `k → i` loops: the compiler can vectorise the
-inner horizontal loop. It also means the timed algorithm pays for a layout
-conversion, and many of the newly threaded loops are streaming operations
-such as zeroing, copying, and simple array arithmetic. Once the node's memory
-bandwidth or a shared cache is busy, extra OpenMP threads add little throughput.
-MPI ranks already using all cores can reach the same bandwidth ceiling.
+The horizontal science layout is sensible for SIMD, but the timed algorithm
+must first create it and later undo it. Many other newly threaded loops are
+also streaming operations—zeroing, copying, and simple array arithmetic—with
+little computation per byte. Once a memory channel or shared cache path is
+busy, extra OpenMP threads add little throughput. The one-thread-per-rank case
+already uses every core on the node, so changing those workers from MPI ranks
+to OpenMP threads does not create new memory bandwidth.
 
 First-touch placement and thread binding can further matter. A rule such as
 one rank per socket is only helpful if pages are placed across the socket's
@@ -235,8 +425,9 @@ replacing them:
 - `gw_ussp_mod` itself contains no MPI or halo exchange. It works on arrays
   already local to a rank, so most of the ticket's transformed region cannot
   directly profit from having fewer MPI neighbours.
-- Fewer ranks make `seg_len` larger. All serial packing, allocation, conversion,
-  and unpacking within each rank grow with it.
+- Fewer ranks make `seg_len` larger. The serial outer gather/scatter and other
+  rank-level setup grow with it. The inner segment work is threaded, but its
+  allocation, copying, scheduling, and tail costs remain.
 - Halo savings concern boundary data; the science computation still has to be
   performed for essentially every owned column.
 - The measurement is a component timer. Even if fewer ranks improve MPI-heavy
@@ -273,6 +464,36 @@ whole run under a simple Amdahl estimate. A 20% whole-component gain seen in a
 different case likely involved a larger previously serial fraction, a more
 compute-bound loop, or a transformation covering the pack/unpack path as well.
 
+## A compact mental model
+
+The source supports the following interpretation:
+
+1. **Outer conversion is the important uncovered serial layer.** It gathers
+   LFRic dofmap fields into horizontal-first, rank-sized science arrays and
+   scatters results back. It is serial because Ticket 813 did not transform
+   that DOMAIN kernel, not because the loops are fundamentally unparallelisable.
+2. **Inner conversion is already part of the OpenMP work.** Each dynamically
+   assigned horizontal segment is packed, processed by one thread's
+   vectorised/vertically sequential core call, and unpacked. Its costs appear
+   as allocation, copying, scheduling, and imbalance rather than as a wholly
+   serial sandwich.
+3. **Vertical recurrence constrains the axis of parallelism.** A column's
+   level $k$ consumes its own level $k-1$ result, so threads take different
+   groups of columns; they do not take independent pieces of one column.
+4. **Segments over-decompose horizontal work.** Dynamic scheduling balances
+   variable-cost columns, while a finite segment keeps SIMD loops useful and
+   bounds the per-thread working set. With perfectly uniform work, many small
+   dynamic segments would be unnecessary, but one cache-conscious block per
+   thread could still be preferable to a rank-sized core call.
+5. **The observed size 32 is consistent with L2, not an L3/rank quota.** Its
+   main arrays occupy about 200 KiB plus temporaries, below a 512 KiB private
+   L2. L3 per rank rises with threads, but so do the rank's workers and work;
+   average L3 per worker remains essentially fixed.
+
+This model explains why two threads can capture a small benefit while larger
+teams encounter the serial wrapper, increasingly frequent waiting, and shared
+resource limits before reduced MPI halo overhead becomes decisive.
+
 ## The most useful follow-up measurements
 
 No compilation or profiler was available for this analysis, so the ordering
@@ -292,9 +513,9 @@ secondary hardware hypotheses:
    and remote-NUMA traffic. Repeat with explicit `OMP_PLACES=cores` and
    `OMP_PROC_BIND=close`/`spread`, and compare ranks per NUMA domain with ranks
    per socket.
-6. Prototype parallel packing/unpacking and reusable per-thread segment buffers.
-   Those changes attack the scaling limit; adding directives to more tiny loops
-   probably does not.
+6. Prototype OpenMP coverage for the outer LFRic gather/scatter, and separately
+   hoist or reuse the inner per-thread segment buffers. Those changes attack
+   the scaling limit; adding directives to more tiny loops probably does not.
 7. Re-test collapsed schedules by compiler. The ticket already demonstrates
    that a schedule which helps GCC can hurt CCE.
 
@@ -309,3 +530,7 @@ where a future optimisation would have to work to move it.
 - [Ticket details, raw results, and final transformed Fortran](https://code.metoffice.gov.uk/trac/lfric_apps/wiki/ticket/813/TicketDetails)
 - [Ticket 813 Sci/Tech review](https://code.metoffice.gov.uk/trac/lfric_apps/wiki/ticket/813/SciTechReview)
 - [Merged implementation](https://github.com/MetOffice/lfric_apps/commit/db82bec425dc45f757e5a575340225d7741e0d6a)
+- [ARCHER2 compute-node hardware](https://docs.archer2.ac.uk/user-guide/hardware/)
+- [AMD EPYC 7742 specifications](https://www.amd.com/en/support/downloads/drivers.html/processors/epyc/epyc-7002-series/amd-epyc-7742.html)
+- [AMD EPYC 7002 “Rome” HPC tuning guide](https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/tuning-guides/amd-epyc-7002-tg-hpc-56827.pdf)
+- [AMD EPYC 7003 “Milan” HPC tuning guide](https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/tuning-guides/high-performance-computing-tuning-guide-amd-epyc7003-series-processors.pdf)
