@@ -7,6 +7,7 @@ platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
 
 [dependencies]
 quarto = "*"
+lychee = "*"
 
 [activation]
 env = { QUARTO_PORT = "8042" }
@@ -15,3 +16,9 @@ env = { QUARTO_PORT = "8042" }
 build = { cmd = "quarto render src", description = "Render the Quarto project" }
 serve = { cmd = "quarto preview src --port $QUARTO_PORT --host 0.0.0.0", description = "Serve the Quarto site on port QUARTO_PORT" }
 clean = { cmd = "rm -rf docs", description = "Remove the Quarto build output" }
+
+# --root-dir resolves the root-relative links Quarto writes into 404.html. It has
+# to be an absolute path, so it cannot live in lychee.toml alongside the rest of
+# the configuration; $PIXI_PROJECT_ROOT supplies one wherever the task is run from.
+linkcheck = { cmd = "lychee --no-ignore --exclude-loopback --max-redirects 10 --root-dir $PIXI_PROJECT_ROOT/docs -v docs", depends-on = ["build"], description = "Check links in the rendered site via lychee" }
+linkcheck-except-429 = { cmd = "lychee --no-ignore --accept '100..=299, 429' --exclude-loopback --max-redirects 10 --root-dir $PIXI_PROJECT_ROOT/docs -v docs", depends-on = ["build"], description = "Check links via lychee, accepting 429 (too many requests). Primarily for CI." }

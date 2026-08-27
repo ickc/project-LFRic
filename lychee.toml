@@ -1,0 +1,24 @@
+# sitemap.xml and robots.txt hold nothing but absolute self-references built
+# from `site-url`. Fetching those over the network would test whatever is
+# currently deployed at lfric.kolen.dev rather than the output just built here —
+# and before the very first deployment it cannot pass at all, since Cloudflare
+# answers for an attached custom domain with no deployment behind it by
+# returning 522. Every internal link is already checked as a local file.
+exclude_path = [
+    "docs/sitemap.xml",
+    "docs/robots.txt",
+]
+
+# Links lychee cannot verify anonymously.
+exclude = [
+    # A private UniExeterRSE repository, so its wiki returns 404 to
+    # unauthenticated requests. Drop this once the repo is public (or run lychee
+    # with --github-token to check it for real).
+    "^https://github\\.com/UniExeterRSE/NG-ARCH",
+    # The Met Office science repository collaboration server, where every ticket
+    # and wiki link on the hybrid-scaling page points. It sits behind
+    # institutional login and answers any path with the login page, so a check
+    # against it is vacuous whether or not it passes — and it is not obviously
+    # reachable from a GitHub Actions runner at all.
+    "^https://code\\.metoffice\\.gov\\.uk/",
+]
