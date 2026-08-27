@@ -20,12 +20,12 @@ The architecture is based on:
 
 | Submodule | Description |
 |-----------|-------------|
-| [arXiv-1809.07267](submodules/arXiv-1809.07267/) | LFRic paper source (Adams et al. 2019) |
-| [lfric_core](submodules/lfric_core/) | Core infrastructure library |
-| [lfric_apps](submodules/lfric_apps/) | Science applications (Momentum® Atm) |
-| [LFRic-Atmosphere-Training](submodules/LFRic-Atmosphere-Training/) | Self-learning training materials |
-| [Isambard3-LFRic-Env-Science-Suites](submodules/Isambard3-LFRic-Env-Science-Suites/) | Spack envs + suites for Isambard3 HPC |
-| [PSyclone](submodules/PSyclone/) | The source-to-source compiler LFRic is built on |
+| [arXiv-1809.07267](https://github.com/ickc/arXiv-1809.07267) | LFRic paper source (Adams et al. 2019) |
+| [lfric_core](https://github.com/MetOffice/lfric_core) | Core infrastructure library |
+| [lfric_apps](https://github.com/MetOffice/lfric_apps) | Science applications (Momentum® Atm) |
+| [LFRic-Atmosphere-Training](https://github.com/MetOffice/LFRic-Atmosphere-Training) | Self-learning training materials |
+| [Isambard3-LFRic-Env-Science-Suites](https://github.com/UniExeterRSE/Isambard3-LFRic-Env-Science-Suites) | Spack envs + suites for Isambard3 HPC |
+| [PSyclone](https://github.com/stfc/PSyclone) | The source-to-source compiler LFRic is built on |
 
 ## Notes
 
