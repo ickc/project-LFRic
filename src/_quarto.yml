@@ -39,6 +39,10 @@ website:
             text: "PSyclone, from the Ground Up"
       - href: glossary.qmd
         text: Glossary
+    right:
+      - icon: github
+        href: https://github.com/ickc/project-LFRic
+        aria-label: GitHub
 
 format:
   html:
