@@ -4,6 +4,7 @@ project:
 
 website:
   title: "LFRic Wiki"
+  site-url: "https://lfric.kolen.dev"
   description: "Personal wiki for LFRic RSE work with Met Office"
   search:
     location: navbar

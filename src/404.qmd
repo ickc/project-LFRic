@@ -1,0 +1,29 @@
+---
+title: "Page not found"
+format:
+  html:
+    toc: false
+    search: false
+---
+
+There is nothing at this address.
+
+The page may have been renamed, or the link that brought you here may be out of
+date. Try one of these instead:
+
+- [Home](index.qmd) — what this wiki is and how it is organised
+- [Glossary](glossary.qmd) — the LFRic vocabulary, defined in one place
+- The search box in the navbar, which covers every page
+
+## Where things live
+
+| | |
+|---|---|
+| [LFRic Core](lfric-core.qmd) | shared infrastructure: mesh, fields, halo exchanges, I/O |
+| [LFRic Apps](lfric-apps.qmd) | the science layer — Momentum® Atmosphere, GungHo |
+| [Modern Fortran, from the Ground Up](fortran/index.ipynb) | the language the model is written in |
+| [PSyclone, from the Ground Up](psyclone/index.ipynb) | the source-to-source compiler |
+| [Isambard3](isambard.qmd) | building and running on the HPC facility |
+| [Paper](paper.qmd) · [Paper, Explained](paper-explained.qmd) | Adams et al. 2019, and a ground-up reading of it |
+| [Formulation, from First Principles](formulation-explained.qmd) | the mixed finite-element discretisation |
+| [PSyclone: Hybrid Scaling](ticket-813-openmp-scaling.qmd) | ticket 813 — MPI×OpenMP scaling notes |
