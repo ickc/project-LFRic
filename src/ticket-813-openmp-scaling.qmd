@@ -106,7 +106,7 @@ cores, 512 KiB of private L2 per core, and 16 MiB of L3 for each four-core Core
 Complex (CCX). The
 [AMD product specification](https://www.amd.com/en/support/downloads/drivers.html/processors/epyc/epyc-7002-series/amd-epyc-7742.html)
 gives 256 MiB of L3 per socket, hence 512 MiB per node, but AMD's
-[Rome HPC guide](https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/tuning-guides/amd-epyc-7002-tg-hpc-56827.pdf)
+[Rome HPC guide](https://docs.amd.com/v/u/en-US/amd-epyc-7002-tg-hpc-56827)
 shows that it is physically partitioned into 16 MiB CCX slices rather than one
 uniform socket-wide pool. ARCHER2 also configures eight 16-core NUMA regions
 per node.
@@ -532,5 +532,5 @@ where a future optimisation would have to work to move it.
 - [Merged implementation](https://github.com/MetOffice/lfric_apps/commit/db82bec425dc45f757e5a575340225d7741e0d6a)
 - [ARCHER2 compute-node hardware](https://docs.archer2.ac.uk/user-guide/hardware/)
 - [AMD EPYC 7742 specifications](https://www.amd.com/en/support/downloads/drivers.html/processors/epyc/epyc-7002-series/amd-epyc-7742.html)
-- [AMD EPYC 7002 “Rome” HPC tuning guide](https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/tuning-guides/amd-epyc-7002-tg-hpc-56827.pdf)
+- [AMD EPYC 7002 “Rome” HPC tuning guide](https://docs.amd.com/v/u/en-US/amd-epyc-7002-tg-hpc-56827)
 - [AMD EPYC 7003 “Milan” HPC tuning guide](https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/tuning-guides/high-performance-computing-tuning-guide-amd-epyc7003-series-processors.pdf)
