@@ -1,5 +1,6 @@
 ---
 title: "LFRic Atmosphere Training"
+author: "Claude Code"
 ---
 
 Source: `submodules/LFRic-Atmosphere-Training/`

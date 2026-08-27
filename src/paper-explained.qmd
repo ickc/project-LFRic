@@ -1,6 +1,7 @@
 ---
 title: "The LFRic Paper, from the Ground Up"
 subtitle: "A personal note for the mathematically conversant but possibly rusty"
+author: "Claude Code"
 ---
 
 A companion to [Adams et al. (2019), arXiv:1809.07267](https://arxiv.org/abs/1809.07267) (source in [`submodules/arXiv-1809.07267/`](paper.qmd)). It is not a summary — the paper is short and you will read it. Instead it rebuilds the content from the ground up, in dependency order rather than the paper's order: mesh → function spaces → data model → time → solver → parallelism → compiler. Facts and numbers are from the paper unless marked *(gloss)*; the bridges into CMB data analysis, statistics, and JAX are mine. For term lookup, use the [glossary](glossary.qmd); a reading map back to the paper's sections is at the end.

@@ -1,5 +1,6 @@
 ---
 title: "LFRic Wiki"
+author: "Claude Code"
 ---
 
 Personal wiki and workspace for LFRic RSE work in collaboration with the Met Office.

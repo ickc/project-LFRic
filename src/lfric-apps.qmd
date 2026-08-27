@@ -1,5 +1,6 @@
 ---
 title: "LFRic Apps"
+author: "Claude Code"
 ---
 
 Source: `submodules/lfric_apps/`

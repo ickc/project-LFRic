@@ -1,6 +1,7 @@
 ---
 title: "PSyclone, from the Ground Up"
 subtitle: "A personal note for a Python/HPC programmer who has to optimise LFRic"
+author: "Claude Code"
 execute:
   enabled: false
 jupyter:

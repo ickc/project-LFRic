@@ -1,5 +1,6 @@
 ---
 title: "LFRic Core"
+author: "Claude Code"
 ---
 
 Source: `submodules/lfric_core/`

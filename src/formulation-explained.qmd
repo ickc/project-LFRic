@@ -1,6 +1,7 @@
 ---
 title: "The GungHo Equations, from First Principles"
 subtitle: "A personal note for the mathematically conversant but possibly rusty"
+author: "Claude Code"
 ---
 
 A ground-up companion to §2.1 *Formulation* of [Adams et al. (2019)](https://arxiv.org/abs/1809.07267) (source in [`submodules/arXiv-1809.07267/`](paper.qmd)). The wider companion [Paper, Explained](paper-explained.qmd) *states* these equations (its §3) and reads them at the level of someone who already speaks fluid dynamics; this note instead **derives** them from scratch — Newton's second law, the first law of thermodynamics, a rotating frame — at the level of an undergraduate physics course, for a reader whose graduate fluids has gone rusty. Standard results are recalled, not assumed; the two genuinely unfamiliar objects (potential temperature $\theta$, Exner pressure $\Pi$) get a full account. Terms are in the [glossary](glossary.qmd); a reading map is at the end.

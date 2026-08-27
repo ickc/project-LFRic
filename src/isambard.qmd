@@ -1,5 +1,6 @@
 ---
 title: "Isambard3 LFRic Setup"
+author: "Claude Code"
 ---
 
 Source: `submodules/Isambard3-LFRic-Env-Science-Suites/`

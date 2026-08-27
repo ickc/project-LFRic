@@ -1,5 +1,6 @@
 ---
 title: "LFRic Paper (arXiv:1809.07267)"
+author: "Claude Code"
 ---
 
 Source: `submodules/arXiv-1809.07267/`

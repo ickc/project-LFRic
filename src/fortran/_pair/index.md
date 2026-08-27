@@ -1,6 +1,7 @@
 ---
 title: "Modern Fortran, from the Ground Up"
 subtitle: "A personal note for a Python/HPC programmer who has to read LFRic"
+author: "Claude Code"
 filters:
   - fortran-highlight.lua
 execute:

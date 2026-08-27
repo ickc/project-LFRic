@@ -1,5 +1,6 @@
 ---
 title: "Glossary"
+author: "Claude Code"
 ---
 
 Terms drawn from the LFRic submodules and the Adams et al. 2019 paper
