@@ -33,9 +33,11 @@ After cloning: `git submodule update --init --recursive`
 Quarto source lives in `src/`; output is rendered to `docs/`. Uses [pixi](https://pixi.sh) for environment management:
 
 ```bash
-pixi run serve    # live-reload preview at http://localhost:8042
-pixi run build    # render src/ to docs/
-pixi run clean    # remove docs/
+pixi run serve                  # live-reload preview at http://localhost:8042
+pixi run build                  # render src/ to docs/
+pixi run linkcheck              # build, then check every link with lychee
+pixi run linkcheck-except-429   # same, tolerating rate-limit responses; this is what CI runs
+pixi run clean                  # remove docs/ and src/.quarto/
 ```
 
 Without pixi, requires `quarto` on PATH:
@@ -44,6 +46,65 @@ Without pixi, requires `quarto` on PATH:
 quarto preview src --port 8042
 quarto render src
 ```
+
+### Deployment
+
+The site is served by [Cloudflare Pages](https://pages.cloudflare.com) at
+<https://lfric.kolen.dev>, from the Pages project `lfric-kolen-dev`. It is not a
+GitHub Pages site, so nothing here needs a `.nojekyll` marker or a committed
+`docs/` — the rendered output stays untracked and is uploaded straight to
+Cloudflare.
+
+`.github/workflows/ci.yml` does the whole thing:
+
+1. **build** — `pixi run build`, then `pixi run linkcheck-except-429`, then
+   uploads `docs/` as an artifact.
+2. **deploy** — downloads that artifact and hands it to
+   `wrangler pages deploy --project-name=lfric-kolen-dev --branch=<ref>`.
+
+The build runs once and the deploy is gated on it, so a broken link stops the
+publish. `--branch` is what decides production from preview: `main` lands as the
+deployment `lfric.kolen.dev` serves, every other branch lands as a preview at
+`https://<branch>.lfric-kolen-dev.pages.dev`. It has to be passed explicitly,
+because the deploy job only downloads the built artifact and so has no `.git` for
+wrangler to infer the branch from. Pull requests from forks run the build only.
+
+CI does **not** check out `submodules/`. Four of the six are private Met Office
+or partner repositories that a CI token cannot reach, and the render does not
+need them: the Quarto project root is `src/`, and the two notebooks under it are
+committed with their outputs. Keep it that way — a page that reads from
+`submodules/` at render time would break the build on a fresh clone.
+
+The credentials — `CLOUDFLARE_API_TOKEN` (scoped to *Cloudflare Pages: Edit*)
+and `CLOUDFLARE_ACCOUNT_ID` — live in the repository's `production` and
+`preview` **environments**, not in its repository secrets. That is why the
+deploy job names an environment: a job that does not cannot read them, and
+`secrets.CLOUDFLARE_API_TOKEN` silently expands to the empty string rather than
+failing outright.
+
+The link check runs against the freshly built `docs/` on disk, never against the
+deployed site, which is why `lychee.toml` drops `sitemap.xml` and `robots.txt`
+from the crawl: they contain only absolute self-references, so fetching them
+would report on whatever is already live rather than on the output about to be
+published. For the same reason the linkcheck tasks pass `--root-dir`: `404.qmd`
+links from the site root rather than relatively, and without a root directory
+lychee cannot resolve a `/`-prefixed link against a local file. It has to be an
+absolute path, so it lives in the pixi task rather than in `lychee.toml`.
+
+### `src/404.qmd` — the not-found page
+
+It renders to `docs/404.html`, and Cloudflare Pages serves it, with a 404 status,
+for any URL matching no file. Its presence in the output root is the whole
+configuration: Pages infers a project's not-found behaviour from the files it is
+given, and a site with no `404.html` answers with `index.html` instead, so an
+unknown URL lands on the home page. Being outside the navbar, it appears in no
+menu, and Quarto keeps it out of `sitemap.xml` and the search index.
+
+The one thing to know when editing it: because it is served at URLs of any depth,
+Quarto writes its links and assets from the site root (`/glossary.html`) rather
+than relatively, which it can only do because `site-url` is set in
+`src/_quarto.yml`. Links in the source are still written the normal way, to the
+source file — Quarto handles the rest.
 
 ### `src/fortran/` — a nested pixi project
 
