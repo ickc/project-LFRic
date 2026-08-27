@@ -44,7 +44,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: site
-          path: docs
+          path: src/docs
           include-hidden-files: true
           retention-days: 1
 
@@ -83,7 +83,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: site
-          path: docs
+          path: src/docs
       - id: deploy
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
@@ -98,7 +98,7 @@ jobs:
           # artifact and so has no .git to infer from. Left off entirely, every
           # upload — main included — would land as a preview.
           command: >-
-            pages deploy docs
+            pages deploy src/docs
             --project-name=lfric-kolen-dev
             --branch=${{ github.ref_name }}
             --commit-dirty=true

@@ -5,8 +5,8 @@
 # answers for an attached custom domain with no deployment behind it by
 # returning 522. Every internal link is already checked as a local file.
 exclude_path = [
-    "docs/sitemap.xml",
-    "docs/robots.txt",
+    "src/docs/sitemap.xml",
+    "src/docs/robots.txt",
 ]
 
 # Links lychee cannot verify anonymously.

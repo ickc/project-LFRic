@@ -4,7 +4,7 @@ Personal wiki and workspace for LFRic RSE work in collaboration with the Met Off
 
 ## What This Repo Is
 
-A Quarto website + submodule collection serving as a personal knowledge base around LFRic. The site is rendered to `docs/` and can be served locally or published to GitHub Pages.
+A Quarto website + submodule collection serving as a personal knowledge base around LFRic. The site is rendered to `src/docs/` and can be served locally or published to Cloudflare Pages.
 
 ## Submodules (`submodules/`)
 
@@ -30,14 +30,14 @@ After cloning: `git submodule update --init --recursive`
 
 ## Building the Website
 
-Quarto source lives in `src/`; output is rendered to `docs/`. Uses [pixi](https://pixi.sh) for environment management:
+Quarto source lives in `src/`; output is rendered to `src/docs/`. Uses [pixi](https://pixi.sh) for environment management:
 
 ```bash
 pixi run serve                  # live-reload preview at http://localhost:8042
-pixi run build                  # render src/ to docs/
+pixi run build                  # render src/ to src/docs/
 pixi run linkcheck              # build, then check every link with lychee
 pixi run linkcheck-except-429   # same, tolerating rate-limit responses; this is what CI runs
-pixi run clean                  # remove docs/ and src/.quarto/
+pixi run clean                  # remove src/docs/ and src/.quarto/
 ```
 
 Without pixi, requires `quarto` on PATH:
@@ -58,9 +58,9 @@ Cloudflare.
 `.github/workflows/ci.yml` does the whole thing:
 
 1. **build** — `pixi run build`, then `pixi run linkcheck-except-429`, then
-   uploads `docs/` as an artifact.
+   uploads `src/docs/` as an artifact.
 2. **deploy** — downloads that artifact and hands it to
-   `wrangler pages deploy --project-name=lfric-kolen-dev --branch=<ref>`.
+   `wrangler pages deploy src/docs --project-name=lfric-kolen-dev --branch=<ref>`.
 
 The build runs once and the deploy is gated on it, so a broken link stops the
 publish. `--branch` is what decides production from preview: `main` lands as the
@@ -82,7 +82,7 @@ deploy job names an environment: a job that does not cannot read them, and
 `secrets.CLOUDFLARE_API_TOKEN` silently expands to the empty string rather than
 failing outright.
 
-The link check runs against the freshly built `docs/` on disk, never against the
+The link check runs against the freshly built `src/docs/` on disk, never against the
 deployed site, which is why `lychee.toml` drops `sitemap.xml` and `robots.txt`
 from the crawl: they contain only absolute self-references, so fetching them
 would report on whatever is already live rather than on the output about to be
@@ -93,7 +93,7 @@ absolute path, so it lives in the pixi task rather than in `lychee.toml`.
 
 ### `src/404.qmd` — the not-found page
 
-It renders to `docs/404.html`, and Cloudflare Pages serves it, with a 404 status,
+It renders to `src/docs/404.html`, and Cloudflare Pages serves it, with a 404 status,
 for any URL matching no file. Its presence in the output root is the whole
 configuration: Pages infers a project's not-found behaviour from the files it is
 given, and a site with no `404.html` answers with `index.html` instead, so an

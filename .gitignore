@@ -1,4 +1,6 @@
-/.quarto/
-**/*.quarto_ipynb
-docs/
+# pixi
 .pixi/
+# quarto
+/src/.quarto/
+/src/docs/
+**/*.quarto_ipynb
