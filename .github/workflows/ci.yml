@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    # Every branch, not just main: a push to any other branch produces a preview
+    # deployment at https://<branch>.lfric-kolen-dev.pages.dev.
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege by default; the deploy job widens nothing, it only restates this.
+permissions:
+  contents: read
+
+# Actions are pinned to commit SHAs rather than tags: a tag can be moved to point at
+# new code, and `wrangler-action` runs in the same job as the Cloudflare API token.
+# The trailing comment is the human-readable version; Dependabot updates both.
+
+jobs:
+  build:
+    name: Build and check links
+    # Branches in this repository are already covered by the `push` trigger, so the
+    # `pull_request` trigger only needs to serve pull requests from forks. Without
+    # this, every same-repo PR would build twice.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
+    runs-on: ubuntu-latest
+    steps:
+      # Submodules are deliberately not checked out. Four of the six are private
+      # Met Office / partner repositories that a CI token cannot reach, and the
+      # site does not need them: the Quarto project root is `src/`, and the two
+      # notebooks under it are committed with their outputs, so nothing in the
+      # render reads `submodules/`.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
+        with:
+          locked: true
+      - run: pixi run build
+      - run: pixi run linkcheck-except-429
+      # Handed to the deploy job so the site is built exactly once.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: site
+          path: docs
+          include-hidden-files: true
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    # Two exclusions, both load-bearing:
+    #
+    #   pull_request — a fork pull request must never reach CLOUDFLARE_API_TOKEN.
+    #     That token is account-wide `Cloudflare Pages: Edit`, so it can deploy to
+    #     and delete every Pages project in the account, not just this one. Fork
+    #     pull requests cannot read environment secrets, so this holds by
+    #     construction — but only while deploy stays off the pull_request trigger.
+    #
+    #   dependabot — GitHub routes Dependabot-triggered runs to a separate secrets
+    #     store, so the token would expand to an empty string and every dependency
+    #     bump would fail here.
+    #
+    # Branches in this repository are covered by the `push` trigger, which is what
+    # makes previews appear before a pull request is even opened.
+    if: github.event_name != 'pull_request' && github.actor != 'dependabot[bot]'
+    needs: [build]
+    runs-on: ubuntu-latest
+    # CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are environment secrets, not
+    # repository secrets, so the job has to name the environment to see them. The
+    # name is conditional so that `production` can later carry a deployment branch
+    # policy restricting it to main without breaking preview deploys.
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
+      # Renders as a clickable "View deployment" button on the run, and as the
+      # environment's current URL in the repository sidebar.
+      url: ${{ steps.deploy.outputs.pages-deployment-alias-url || steps.deploy.outputs.deployment-url }}
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: site
+          path: docs
+      - id: deploy
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # --branch decides production vs preview. Passing the branch that is
+          # actually being built means main lands as production (the deployment
+          # lfric.kolen.dev serves) and everything else lands as a preview.
+          #
+          # It has to be passed explicitly: wrangler normally infers the branch
+          # from the checked-out repository, but this job only downloads the built
+          # artifact and so has no .git to infer from. Left off entirely, every
+          # upload — main included — would land as a preview.
+          command: >-
+            pages deploy docs
+            --project-name=lfric-kolen-dev
+            --branch=${{ github.ref_name }}
+            --commit-dirty=true
+      - name: Summarise the deployment
+        run: |
+          {
+            echo "### Deployed \`${{ github.ref_name }}\`"
+            echo
+            echo "| | URL |"
+            echo "|---|---|"
+            echo "| Branch (stable) | ${{ steps.deploy.outputs.pages-deployment-alias-url }} |"
+            echo "| This deployment | ${{ steps.deploy.outputs.deployment-url }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
