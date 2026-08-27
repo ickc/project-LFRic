@@ -75,7 +75,7 @@ The PSyclone tutorial page, same arrangement as `src/fortran/` (edit `_pair/inde
 
 ## Explainer Notes (house tone)
 
-`src/paper-explained.qmd` is the model for personalized explainer documents; the full style spec lives in the `explain` skill (`.claude/skills/explain/SKILL.md`). Short version: ground-up rebuild in logical order (not source order); math formalism first; bridges into the reader's fields (CMB data analysis, statistics, JAX); footnotes (not blockquotes) for asides and etymology; mark interpretive claims *(gloss)* vs. source claims; summary table at the end; British spelling. Style ancestors: `~/git/private/project-ai/notes/` (`tokenization_notes.md`, `adamw_notes.md`).
+`src/paper-explained.qmd` is the model for personalized explainer documents; the full style spec lives in the `explain` skill (`.claude/skills/explain/SKILL.md`). Short version: ground-up rebuild in logical order (not source order); math formalism first; bridges into the reader's fields (CMB data analysis, statistics, JAX); footnotes (not blockquotes) for asides and etymology; mark interpretive claims *(gloss)* vs. source claims; summary table at the end; British spelling. Style ancestors: earlier notes of the same kind kept outside this repo (`tokenization_notes.md`, `adamw_notes.md`).
 
 ## External Links
 

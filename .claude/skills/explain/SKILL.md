@@ -36,5 +36,5 @@ Math + Physics bachelor, Physics PhD in CMB data analysis. Fluent (possibly rust
 
 ## Style references
 
-- `~/git/private/project-ai/notes/tokenization_notes.md` and `adamw_notes.md` — the canonical examples.
+- `tokenization_notes.md` and `adamw_notes.md`, in the user's notes repo outside this project — the canonical examples.
 - `src/paper-explained.qmd` in this repo — a full paper companion in this style.
