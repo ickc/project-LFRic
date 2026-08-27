@@ -15,7 +15,7 @@ env = { QUARTO_PORT = "8042" }
 [tasks]
 build = { cmd = "quarto render src", description = "Render the Quarto project" }
 serve = { cmd = "quarto preview src --port $QUARTO_PORT --host 0.0.0.0", description = "Serve the Quarto site on port QUARTO_PORT" }
-clean = { cmd = "rm -rf docs", description = "Remove the Quarto build output" }
+clean = { cmd = "rm -rf docs src/.quarto", description = "Remove generated files (Quarto output and cache)" }
 
 # --root-dir resolves the root-relative links Quarto writes into 404.html. It has
 # to be an absolute path, so it cannot live in lychee.toml alongside the rest of
