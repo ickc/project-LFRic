@@ -33,8 +33,8 @@ After cloning: `git submodule update --init --recursive`
 Quarto source lives in `src/`; output is rendered to `src/docs/`. Uses [pixi](https://pixi.sh) for environment management:
 
 ```bash
-pixi run preview                # live-reload preview at http://localhost:8042
-pixi run serve                  # serve the rendered src/docs/ as is, on the same port
+pixi run preview                # re-render on save into src/docs/, serving nothing
+QUARTO_ARGS= pixi run preview   # the same, with quarto's own live-reload server
 pixi run build                  # render src/ to src/docs/
 pixi run linkcheck              # build, then check every link with lychee
 pixi run linkcheck-except-429   # same, tolerating rate-limit responses; this is what CI runs
@@ -44,7 +44,7 @@ pixi run clean                  # remove src/docs/ and src/.quarto/
 Without pixi, requires `quarto` on PATH:
 
 ```bash
-quarto preview src --port 8042
+quarto preview src
 quarto render src
 ```
 

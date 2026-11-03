@@ -9,7 +9,7 @@ The site is a [Quarto](https://quarto.org) website built from `src/`, with
 
 ```bash
 git submodule update --init --recursive   # only needed to re-run the notebooks
-pixi run preview                          # live preview on http://localhost:8042
+QUARTO_ARGS= pixi run preview             # live preview, with quarto's own server
 pixi run build                            # render src/ into src/docs/
 pixi run linkcheck                        # build, then check every link
 ```
