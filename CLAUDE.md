@@ -34,7 +34,7 @@ Quarto source lives in `src/`; output is rendered to `src/docs/`. Uses [pixi](ht
 
 ```bash
 pixi run preview                # live-reload preview at http://localhost:8042
-pixi run serve                  # the same, reachable from other machines
+pixi run serve                  # serve the rendered src/docs/ as is, on the same port
 pixi run build                  # render src/ to src/docs/
 pixi run linkcheck              # build, then check every link with lychee
 pixi run linkcheck-except-429   # same, tolerating rate-limit responses; this is what CI runs
