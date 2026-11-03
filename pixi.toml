@@ -9,13 +9,9 @@ platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
 quarto = ">=1.11.9,<2"
 lychee = "*"
 
-[activation]
-env = { QUARTO_PORT = "8042" }
-
 [tasks]
 build = { cmd = "quarto render src", description = "Render the Quarto project" }
-preview = { cmd = "quarto preview src --port $QUARTO_PORT --host 0.0.0.0", description = "Live preview on port QUARTO_PORT: quarto re-renders what you save" }
-serve = { cmd = "python3 -m http.server $QUARTO_PORT -d src/docs", description = "Serve the rendered site in src/docs on port QUARTO_PORT, as is" }
+preview = { cmd = "bash -c 'exec quarto preview src ${QUARTO_ARGS---no-serve --no-browser --no-navigate}'", description = "Re-render what you save into the output directory; QUARTO_ARGS (default: --no-serve --no-browser --no-navigate) replaces the flags, empty for quarto's own server" }
 clean = { cmd = "rm -rf src/docs src/.quarto", description = "Remove generated files (Quarto output and cache)" }
 
 # --root-dir resolves the root-relative links Quarto writes into 404.html. It has
