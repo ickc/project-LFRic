@@ -33,7 +33,8 @@ After cloning: `git submodule update --init --recursive`
 Quarto source lives in `src/`; output is rendered to `src/docs/`. Uses [pixi](https://pixi.sh) for environment management:
 
 ```bash
-pixi run serve                  # live-reload preview at http://localhost:8042
+pixi run preview                # live-reload preview at http://localhost:8042
+pixi run serve                  # the same, reachable from other machines
 pixi run build                  # render src/ to src/docs/
 pixi run linkcheck              # build, then check every link with lychee
 pixi run linkcheck-except-429   # same, tolerating rate-limit responses; this is what CI runs
@@ -46,6 +47,15 @@ Without pixi, requires `quarto` on PATH:
 quarto preview src --port 8042
 quarto render src
 ```
+
+### Shared configuration
+
+`src/_quarto.yml`, `src/shared.scss` and `src/_extensions/copyright-year/` are
+shared with the author's other Quarto sites and copied verbatim from
+[ickc/quarto-template](https://github.com/ickc/quarto-template): do not edit
+them here, as the next sync overwrites them. This site's own settings (title,
+navbar, `site-url`, …) are in `src/_quarto-site.yml`, which Quarto merges on top
+of `src/_quarto.yml`, and its own styles in `src/custom.scss`.
 
 ### Deployment
 
@@ -103,7 +113,7 @@ menu, and Quarto keeps it out of `sitemap.xml` and the search index.
 The one thing to know when editing it: because it is served at URLs of any depth,
 Quarto writes its links and assets from the site root (`/glossary.html`) rather
 than relatively, which it can only do because `site-url` is set in
-`src/_quarto.yml`. Links in the source are still written the normal way, to the
+`src/_quarto-site.yml`. Links in the source are still written the normal way, to the
 source file — Quarto handles the rest.
 
 ### `src/fortran/` — a nested pixi project
