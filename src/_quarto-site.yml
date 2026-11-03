@@ -1,0 +1,46 @@
+# This site's own settings, merged on top of the shared `_quarto.yml` from
+# https://github.com/ickc/quarto-template (see there for how the two combine).
+project:
+  output-dir: docs
+
+website:
+  title: "LFRic Wiki"
+  site-url: "https://lfric.kolen.dev"
+  description: "Personal wiki for LFRic RSE work with Met Office"
+  search:
+    location: navbar
+    type: overlay
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - text: Resources
+        menu:
+          - href: lfric-core.qmd
+            text: LFRic Core
+          - href: lfric-apps.qmd
+            text: LFRic Apps
+          - href: ticket-813-openmp-scaling.qmd
+            text: "PSyclone: Hybrid Scaling"
+          - href: training.qmd
+            text: Training
+          - href: isambard.qmd
+            text: Isambard3
+          - href: paper.qmd
+            text: Paper
+          - href: paper-explained.qmd
+            text: "Paper, Explained"
+          - href: formulation-explained.qmd
+            text: "Formulation, from First Principles"
+      - text: Learn
+        menu:
+          - href: fortran/index.ipynb
+            text: "Modern Fortran, from the Ground Up"
+          - href: psyclone/index.ipynb
+            text: "PSyclone, from the Ground Up"
+      - href: glossary.qmd
+        text: Glossary
+    right:
+      - icon: github
+        href: https://github.com/ickc/project-LFRic
+        aria-label: GitHub
