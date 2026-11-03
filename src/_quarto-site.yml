@@ -2,6 +2,9 @@
 # https://github.com/ickc/quarto-template (see there for how the two combine).
 project:
   output-dir: docs
+  # The post graph (the template's README, "The post graph"): graph.json and its viewer.
+  post-render:
+    - paragraphic build --preset quarto --groups directories --exclude 404.html
 
 website:
   title: "LFRic Wiki"
@@ -14,6 +17,8 @@ website:
     left:
       - href: index.qmd
         text: Home
+      - href: graph.md
+        text: Graph
       - text: Resources
         menu:
           - href: lfric-core.qmd
@@ -44,3 +49,9 @@ website:
       - icon: github
         href: https://github.com/ickc/project-LFRic
         aria-label: GitHub
+
+format:
+  html:
+    # The page's own graph card (the post graph).
+    include-after-body:
+      - _paragraphic.html

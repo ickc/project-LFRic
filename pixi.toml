@@ -8,6 +8,13 @@ platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
 [dependencies]
 quarto = ">=1.11.9,<2"
 lychee = "*"
+# paragraphic, the post graph (the template's README, "The post graph")
+python = ">=3.12"
+beautifulsoup4 = "*"
+pyyaml = "*"
+
+[pypi-dependencies]
+paragraphic = { version = ">=0.2.1,<0.3", extras = ["quarto"] }
 
 [tasks]
 build = { cmd = "quarto render src", description = "Render the Quarto project" }
