@@ -49,4 +49,10 @@ format:
     theme: cosmo
     toc: true
     toc-depth: 3
-    html-math-method: katex
+    # MathJax 4 for its Schola font, as in the other Quarto sites.
+    html-math-method:
+      method: mathjax
+      url: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-chtml.js
+    include-in-header:
+      - text: |
+          <script>window.MathJax = { output: { font: "mathjax-schola" } };</script>
